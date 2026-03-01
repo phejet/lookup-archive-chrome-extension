@@ -27,9 +27,21 @@ function showStatus(text) {
   banner.style.display = 'block';
 }
 
+function fadeAndHideStatus() {
+  if (!statusBanner) return;
+  statusBanner.classList.add('fading');
+  setTimeout(() => {
+    if (statusBanner) {
+      statusBanner.style.display = 'none';
+      statusBanner.classList.remove('fading');
+    }
+  }, 1000); // matches CSS transition duration
+}
+
 function hideStatus() {
   if (statusBanner) {
     statusBanner.style.display = 'none';
+    statusBanner.classList.remove('fading');
   }
 }
 
@@ -132,7 +144,7 @@ async function scanPage() {
     const entries = collectNewLinks();
     if (entries.length === 0) {
       showStatus('No new article links to scan.');
-      setTimeout(hideStatus, 3000);
+      setTimeout(fadeAndHideStatus, 3000);
       scanInProgress = false;
       return;
     }
@@ -181,7 +193,7 @@ async function scanPage() {
     const summary = `Scan complete: ${checked} scanned, ${found} archived, ${notFound} not found`;
     console.log(`[Archive.today] ${summary}`);
     showStatus(summary);
-    setTimeout(hideStatus, 8000);
+    setTimeout(fadeAndHideStatus, 5000);
   } finally {
     scanInProgress = false;
     currentScanIsManual = false;
