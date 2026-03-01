@@ -6,7 +6,6 @@
   "permissions": [
     "contextMenus",
     "storage",
-    "notifications",
     "activeTab"
   ],
   "host_permissions": [

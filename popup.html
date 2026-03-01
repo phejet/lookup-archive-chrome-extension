@@ -4,81 +4,31 @@
   <meta charset="utf-8">
   <style>
     body {
-      width: 320px;
+      width: 280px;
       padding: 16px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 14px;
+      font-size: 13px;
       color: #333;
+      line-height: 1.5;
     }
     h2 {
-      margin: 0 0 12px;
-      font-size: 16px;
+      margin: 0 0 10px;
+      font-size: 15px;
     }
-    .input-row {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
+    p {
+      margin: 0 0 8px;
     }
-    #prefix-input {
-      flex: 1;
-      padding: 6px 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 13px;
-    }
-    #add-btn {
-      padding: 6px 12px;
-      background: #1a73e8;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 13px;
-    }
-    #add-btn:hover {
-      background: #1557b0;
-    }
-    .prefix-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    .prefix-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 6px 8px;
-      border-bottom: 1px solid #eee;
-    }
-    .prefix-item span {
-      font-family: monospace;
-      font-size: 13px;
-    }
-    .remove-btn {
-      background: none;
-      border: none;
-      color: #d93025;
-      cursor: pointer;
-      font-size: 16px;
-      padding: 0 4px;
-    }
-    .remove-btn:hover {
-      color: #a50e0e;
-    }
-    .empty {
-      color: #999;
-      font-style: italic;
-      font-size: 13px;
+    code {
+      background: #f0f0f0;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 12px;
     }
   </style>
 </head>
 <body>
-  <h2>URL Prefixes to Scan</h2>
-  <div class="input-row">
-    <input type="text" id="prefix-input" placeholder="e.g. afr.com">
-    <button id="add-btn">Add</button>
-  </div>
-  <ul class="prefix-list" id="prefix-list"></ul>
-  <script src="popup.js"></script>
+  <h2>Archive.today Lookup</h2>
+  <p>Right-click any link and select <strong>"Look up on Archive.today"</strong> to open its archived snapshot.</p>
+  <p>Right-click the page background and select <strong>"Scan page for archives"</strong> to find all archived links on the current site.</p>
 </body>
 </html>
