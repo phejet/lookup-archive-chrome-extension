@@ -157,6 +157,7 @@ function collectNewLinks() {
     if (!prefixes.some((prefix) => href.includes(prefix))) continue;
 
     if (!isInViewport(link)) continue;
+    if (link.querySelector('img')) continue;
     if (!isArticleUrl(href)) continue;
 
     const canon = canonicalPath(href);
@@ -279,6 +280,7 @@ function cleanupDoneItems() {
 function injectIndicatorsForCanon(canon, snapshotUrl) {
   const freshLinks = document.querySelectorAll('a[href]:not(.archive-today-indicator)');
   for (const link of freshLinks) {
+    if (link.querySelector('img')) continue;
     if (canonicalPath(link.href) === canon) {
       injectIndicator(link, snapshotUrl);
     }
