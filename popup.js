@@ -103,3 +103,7 @@ addCurrentSiteBtn.addEventListener('click', () => {
     }
   });
 });
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { normalizeDomain, addSite, removeSite, renderSiteList };
+}

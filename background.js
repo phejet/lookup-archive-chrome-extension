@@ -140,3 +140,7 @@ async function setCache(url, snapshotUrl) {
     [key]: { snapshotUrl, timestamp: Date.now() },
   });
 }
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { cacheKey, getCached, setCache, checkArchive, checkBatch, checkBatchCacheOnly };
+}

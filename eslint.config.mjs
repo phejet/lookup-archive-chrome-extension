@@ -31,10 +31,33 @@ export default [
         Map: 'readonly',
         // Chrome extension
         chrome: 'readonly',
+        // Conditional exports
+        module: 'readonly',
       },
     },
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    },
+  },
+  {
+    files: ['tests/**/*.js', 'vitest.config.js'],
+    languageOptions: {
+      sourceType: 'module',
+      globals: {
+        // Vitest globals
+        describe: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        it: 'readonly',
+        vi: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        // Node/jsdom globals
+        module: 'readonly',
+        AbortController: 'readonly',
+      },
     },
   },
 ];

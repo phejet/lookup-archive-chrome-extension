@@ -559,3 +559,13 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 init();
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    canonicalPath,
+    isArticleUrl,
+    isInViewport,
+    injectIndicator,
+    sendMessageWithTimeout,
+  };
+}
