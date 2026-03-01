@@ -31,8 +31,10 @@ function debugLog(...args) {
 // --- Priority queue + worker pool state ---
 const queue = new Map(); // canon -> { url, canon, elements[], state: 'pending'|'in-flight'|'done' }
 let activeWorkers = 0;
-const MAX_WORKERS = 5;
+const MAX_WORKERS = 2;
+const MIN_REQUEST_GAP_MS = 1000;
 let stats = { queued: 0, checked: 0, found: 0, notFound: 0, errors: 0 };
+let backoffUntil = 0;
 let scanStartTime = 0;
 
 // Track fade timeout so we can cancel overlapping fades
@@ -276,18 +278,50 @@ function cleanupDoneItems() {
   }
 }
 
+// --- Relative time formatting ---
+function timeAgo(dateString) {
+  const date = new Date(dateString);
+  if (isNaN(date)) return null;
+  const seconds = Math.floor((Date.now() - date) / 1000);
+  const intervals = [
+    [31536000, 'year'],
+    [2592000, 'month'],
+    [86400, 'day'],
+    [3600, 'hour'],
+    [60, 'minute'],
+  ];
+  for (const [secs, label] of intervals) {
+    const count = Math.floor(seconds / secs);
+    if (count >= 1) return `${count} ${label}${count > 1 ? 's' : ''} ago`;
+  }
+  return 'just now';
+}
+
+function snapshotTooltip(snapshot) {
+  const parts = [];
+  if (snapshot.datetime) {
+    const relative = timeAgo(snapshot.datetime);
+    if (relative) parts.push(`Archived ${relative}`);
+  }
+  if (snapshot.snapshotCount > 0) {
+    parts.push(`${snapshot.snapshotCount} snapshot${snapshot.snapshotCount > 1 ? 's' : ''}`);
+  }
+  return parts.length > 0 ? parts.join(' \u00b7 ') : 'Open archived snapshot';
+}
+
 // --- Inject indicators for a canonical URL ---
-function injectIndicatorsForCanon(canon, snapshotUrl) {
+function injectIndicatorsForCanon(canon, snapshot) {
   const freshLinks = document.querySelectorAll('a[href]:not(.archive-today-indicator)');
   for (const link of freshLinks) {
     if (link.querySelector('img')) continue;
     if (canonicalPath(link.href) === canon) {
-      injectIndicator(link, snapshotUrl);
+      injectIndicator(link, snapshot);
     }
   }
 }
 
-function injectIndicator(link, snapshotUrl) {
+function injectIndicator(link, snapshot) {
+  const snapshotUrl = snapshot.url;
   // Check parent for existing indicator with matching href
   if (link.parentElement) {
     const existing = link.parentElement.querySelector(
@@ -301,7 +335,7 @@ function injectIndicator(link, snapshotUrl) {
   indicator.target = '_blank';
   indicator.rel = 'noopener noreferrer';
   indicator.className = 'archive-today-indicator';
-  indicator.title = 'Open archived snapshot';
+  indicator.title = snapshotTooltip(snapshot);
   indicator.appendChild(iconTemplate.cloneNode(true));
   indicator.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -340,31 +374,51 @@ function showScanComplete() {
 }
 
 // --- Worker function ---
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function worker() {
   activeWorkers++;
   debugLog('Worker started. Active workers:', activeWorkers);
   try {
     while (true) {
+      // Respect backoff from 429 responses
+      const now = Date.now();
+      if (backoffUntil > now) {
+        const waitMs = backoffUntil - now;
+        debugLog('Rate-limited, backing off for ' + waitMs + 'ms');
+        await delay(waitMs);
+      }
+
       const item = pickNextItem();
       if (!item) break;
       try {
         const t0 = performance.now();
-        const snapshotUrl = await sendMessageWithTimeout({ action: 'check-single', url: item.url });
+        const result = await sendMessageWithTimeout({ action: 'check-single', url: item.url });
         debugLog(
           'check-single took ' +
             Math.round(performance.now() - t0) +
             'ms for ' +
             item.url +
             ' → ' +
-            (snapshotUrl ? 'found' : 'not found'),
+            (result && result.rateLimited ? '429' : result ? 'found' : 'not found'),
         );
+
+        if (result && result.rateLimited) {
+          // Put item back as pending and back off
+          item.state = 'pending';
+          backoffUntil = Date.now() + 30000;
+          debugLog('Rate limited, will retry after 30s backoff');
+          continue;
+        }
 
         checkedUrls.add(item.canon);
         item.state = 'done';
 
-        if (snapshotUrl) {
+        if (result) {
           stats.found++;
-          injectIndicatorsForCanon(item.canon, snapshotUrl);
+          injectIndicatorsForCanon(item.canon, result);
         } else {
           stats.notFound++;
         }
@@ -375,6 +429,9 @@ async function worker() {
       }
       stats.checked++;
       updateBanner();
+
+      // Pace requests to avoid rate limiting
+      await delay(MIN_REQUEST_GAP_MS);
     }
   } finally {
     activeWorkers--;
@@ -421,13 +478,13 @@ async function resolveCachedItems() {
 
     for (const item of pendingItems) {
       if (item.url in cached) {
-        const snapshotUrl = cached[item.url];
+        const snapshot = cached[item.url];
         checkedUrls.add(item.canon);
         item.state = 'done';
         stats.checked++;
-        if (snapshotUrl) {
+        if (snapshot) {
           stats.found++;
-          injectIndicatorsForCanon(item.canon, snapshotUrl);
+          injectIndicatorsForCanon(item.canon, snapshot);
         } else {
           stats.notFound++;
         }
@@ -574,6 +631,8 @@ if (typeof module !== 'undefined' && module.exports) {
     canonicalPath,
     isArticleUrl,
     isInViewport,
+    timeAgo,
+    snapshotTooltip,
     injectIndicator,
     sendMessageWithTimeout,
   };

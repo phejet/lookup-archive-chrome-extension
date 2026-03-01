@@ -51,6 +51,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+function readCacheEntry(entry) {
+  if (!entry || !('snapshotUrl' in entry)) return undefined;
+  if (!entry.snapshotUrl) return null;
+  return { url: entry.snapshotUrl, datetime: entry.datetime || null, snapshotCount: entry.snapshotCount || 0 };
+}
+
 async function checkBatchCacheOnly(urls) {
   const keys = urls.map(cacheKey);
   const cacheData = await chrome.storage.local.get(keys);
@@ -58,8 +64,8 @@ async function checkBatchCacheOnly(urls) {
   const results = {};
   for (const url of urls) {
     const entry = cacheData[cacheKey(url)];
-    if (entry && now - entry.timestamp <= CACHE_TTL_MS) {
-      results[url] = entry.snapshotUrl;
+    if (entry && now - entry.timestamp <= CACHE_TTL_MS && 'snapshotUrl' in entry) {
+      results[url] = readCacheEntry(entry);
     }
   }
   return results;
@@ -76,8 +82,8 @@ async function checkBatch(urls) {
 
   for (const url of urls) {
     const entry = cacheData[cacheKey(url)];
-    if (entry && now - entry.timestamp <= CACHE_TTL_MS) {
-      results[url] = entry.snapshotUrl;
+    if (entry && now - entry.timestamp <= CACHE_TTL_MS && 'snapshotUrl' in entry) {
+      results[url] = readCacheEntry(entry);
     } else {
       uncachedUrls.push(url);
     }
@@ -92,9 +98,18 @@ async function checkBatch(urls) {
 }
 
 function parseTimemap(body) {
-  // Find the entry with rel="last memento" or rel="first last memento"
   const lines = body.split('\n');
+  let snapshotUrl = null;
+  let datetime = null;
+  let snapshotCount = 0;
+
   for (const line of lines) {
+    // Count all memento entries
+    if (/rel="[^"]*memento[^"]*"/.test(line)) {
+      snapshotCount++;
+    }
+
+    // Find the entry with rel="last memento" or rel="first last memento"
     if (!/rel="[^"]*last memento[^"]*"/.test(line)) continue;
     const urlMatch = line.match(/^<([^>]+)>/);
     if (!urlMatch) continue;
@@ -105,12 +120,16 @@ function parseTimemap(body) {
       if (!ARCHIVE_DOMAINS.some((d) => hostname === d || hostname.endsWith('.' + d))) continue;
       // Normalize to HTTPS
       parsed.protocol = 'https:';
-      return parsed.href;
+      snapshotUrl = parsed.href;
+      const dtMatch = line.match(/datetime="([^"]+)"/);
+      if (dtMatch) datetime = dtMatch[1];
     } catch {
       continue;
     }
   }
-  return null;
+
+  if (!snapshotUrl) return null;
+  return { url: snapshotUrl, datetime, snapshotCount };
 }
 
 // Check if a URL has an archived snapshot using the Memento TimeMap API.
@@ -120,39 +139,47 @@ async function checkArchive(url) {
   const cached = await getCached(url);
   if (cached !== undefined) return cached;
 
-  let snapshotUrl = null;
+  let snapshot = null;
   try {
     const response = await fetch(TIMEMAP_BASE + url, {
       signal: AbortSignal.timeout(15000),
     });
     if (response.ok) {
       const body = await response.text();
-      snapshotUrl = parseTimemap(body);
+      snapshot = parseTimemap(body);
+    } else if (response.status === 429) {
+      return { rateLimited: true };
     }
   } catch (e) {
     console.error('Archive.today lookup failed for', url, e);
   }
 
-  await setCache(url, snapshotUrl);
-  return snapshotUrl;
+  await setCache(url, snapshot);
+  return snapshot;
 }
 
 async function getCached(url) {
   const key = cacheKey(url);
   const data = await chrome.storage.local.get(key);
   const entry = data[key];
-  if (!entry) return undefined;
+  if (!entry || !('snapshotUrl' in entry)) return undefined;
   if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
     await chrome.storage.local.remove(key);
     return undefined;
   }
-  return entry.snapshotUrl;
+  if (!entry.snapshotUrl) return null;
+  return { url: entry.snapshotUrl, datetime: entry.datetime || null, snapshotCount: entry.snapshotCount || 0 };
 }
 
-async function setCache(url, snapshotUrl) {
+async function setCache(url, snapshot) {
   const key = cacheKey(url);
   await chrome.storage.local.set({
-    [key]: { snapshotUrl, timestamp: Date.now() },
+    [key]: {
+      snapshotUrl: snapshot ? snapshot.url : null,
+      datetime: snapshot ? snapshot.datetime : null,
+      snapshotCount: snapshot ? snapshot.snapshotCount : 0,
+      timestamp: Date.now(),
+    },
   });
 }
 

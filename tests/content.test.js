@@ -149,7 +149,7 @@ describe('injectIndicator', () => {
     link.href = 'https://example.com/article';
     container.appendChild(link);
 
-    mod.injectIndicator(link, 'https://archive.today/snap');
+    mod.injectIndicator(link, { url: 'https://archive.today/snap', datetime: null, snapshotCount: 0 });
 
     const indicator = container.querySelector('.archive-today-indicator');
     expect(indicator).not.toBeNull();
@@ -164,8 +164,9 @@ describe('injectIndicator', () => {
     link.href = 'https://example.com/article';
     container.appendChild(link);
 
-    mod.injectIndicator(link, 'https://archive.today/snap');
-    mod.injectIndicator(link, 'https://archive.today/snap');
+    const snap = { url: 'https://archive.today/snap', datetime: null, snapshotCount: 0 };
+    mod.injectIndicator(link, snap);
+    mod.injectIndicator(link, snap);
 
     const indicators = container.querySelectorAll('.archive-today-indicator');
     expect(indicators.length).toBe(1);
@@ -177,11 +178,55 @@ describe('injectIndicator', () => {
     link.href = 'https://example.com/article';
     container.appendChild(link);
 
-    mod.injectIndicator(link, 'https://archive.today/snap1');
-    mod.injectIndicator(link, 'https://archive.today/snap2');
+    mod.injectIndicator(link, { url: 'https://archive.today/snap1', datetime: null, snapshotCount: 0 });
+    mod.injectIndicator(link, { url: 'https://archive.today/snap2', datetime: null, snapshotCount: 0 });
 
     const indicators = container.querySelectorAll('.archive-today-indicator');
     expect(indicators.length).toBe(2);
+  });
+});
+
+describe('timeAgo', () => {
+  test('returns relative time for past dates', () => {
+    const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toUTCString();
+    expect(mod.timeAgo(oneYearAgo)).toBe('1 year ago');
+  });
+
+  test('pluralizes correctly', () => {
+    const threeMonthsAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toUTCString();
+    expect(mod.timeAgo(threeMonthsAgo)).toBe('3 months ago');
+  });
+
+  test('returns null for invalid date', () => {
+    expect(mod.timeAgo('not-a-date')).toBeNull();
+  });
+
+  test('returns "just now" for very recent dates', () => {
+    expect(mod.timeAgo(new Date().toUTCString())).toBe('just now');
+  });
+});
+
+describe('snapshotTooltip', () => {
+  test('shows relative time and count', () => {
+    const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toUTCString();
+    const result = mod.snapshotTooltip({ datetime: oneYearAgo, snapshotCount: 3 });
+    expect(result).toBe('Archived 1 year ago \u00b7 3 snapshots');
+  });
+
+  test('uses singular for 1 snapshot', () => {
+    const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toUTCString();
+    const result = mod.snapshotTooltip({ datetime: oneMonthAgo, snapshotCount: 1 });
+    expect(result).toBe('Archived 1 month ago \u00b7 1 snapshot');
+  });
+
+  test('falls back when no datetime', () => {
+    const result = mod.snapshotTooltip({ datetime: null, snapshotCount: 5 });
+    expect(result).toBe('5 snapshots');
+  });
+
+  test('falls back to default when no data', () => {
+    const result = mod.snapshotTooltip({ datetime: null, snapshotCount: 0 });
+    expect(result).toBe('Open archived snapshot');
   });
 });
 
