@@ -1,9 +1,15 @@
-const toggle = document.getElementById('auto-scan');
+const autoScanToggle = document.getElementById('auto-scan');
+const showProgressToggle = document.getElementById('show-progress');
 
-chrome.storage.sync.get({ autoScan: false }, (data) => {
-  toggle.checked = data.autoScan;
+chrome.storage.sync.get({ autoScan: false, showProgress: false }, (data) => {
+  autoScanToggle.checked = data.autoScan;
+  showProgressToggle.checked = data.showProgress;
 });
 
-toggle.addEventListener('change', () => {
-  chrome.storage.sync.set({ autoScan: toggle.checked });
+autoScanToggle.addEventListener('change', () => {
+  chrome.storage.sync.set({ autoScan: autoScanToggle.checked });
+});
+
+showProgressToggle.addEventListener('change', () => {
+  chrome.storage.sync.set({ showProgress: showProgressToggle.checked });
 });

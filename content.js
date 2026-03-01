@@ -5,14 +5,49 @@ const ARCHIVE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1
 // Track which canonical URLs we've already checked (to avoid re-checking on scroll)
 const checkedUrls = new Set();
 let scanInProgress = false;
+let showProgress = false;
 
+// --- Status badge (discreet, bottom-right) ---
+let statusBadge = null;
+let statusExpanded = false;
+
+function getOrCreateBadge() {
+  if (statusBadge) return statusBadge;
+  statusBadge = document.createElement('div');
+  statusBadge.id = 'archive-today-badge';
+  statusBadge.addEventListener('click', () => {
+    statusExpanded = !statusExpanded;
+    statusBadge.classList.toggle('expanded', statusExpanded);
+  });
+  document.body.appendChild(statusBadge);
+  return statusBadge;
+}
+
+function updateBadge(text, count) {
+  if (!showProgress) return;
+  const badge = getOrCreateBadge();
+  badge.setAttribute('data-count', count || '');
+  badge.setAttribute('data-text', text);
+  badge.innerHTML = statusExpanded
+    ? `<span class="archive-badge-text">${text}</span>`
+    : ARCHIVE_ICON_SVG;
+  badge.style.display = 'flex';
+}
+
+function hideBadge() {
+  if (statusBadge) {
+    statusBadge.style.display = 'none';
+  }
+}
+
+// --- Message listener ---
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'scan-page') {
     scanPage();
   }
 });
 
-// Returns canonical URL path (strips query params, fragments, trailing slash)
+// --- URL helpers ---
 function canonicalPath(href) {
   try {
     const u = new URL(href);
@@ -22,33 +57,26 @@ function canonicalPath(href) {
   }
 }
 
-// Check if a URL looks like an article (not a section/homepage/utility link)
 function isArticleUrl(href) {
   try {
     const u = new URL(href);
     const path = u.pathname;
-
-    // Skip bare homepages and section pages (0-1 meaningful path segments)
     const segments = path.split('/').filter(s => s.length > 0);
     if (segments.length < 2) return false;
 
-    // Common article URL patterns
     const articlePatterns = [
-      /\/\d{4}\/\d{2}\//, // date-based: /2024/03/...
-      /\/\d{8}\//, // compact date: /20240301/...
-      /\/article\//, // explicit article path
-      /\/story\//, // story path
-      /\/news\//, // news path
-      /\/opinion\//, // opinion path
-      /\/p\//, // substack-style
+      /\/\d{4}\/\d{2}\//,
+      /\/\d{8}\//,
+      /\/article\//,
+      /\/story\//,
+      /\/news\//,
+      /\/opinion\//,
+      /\/p\//,
     ];
     if (articlePatterns.some(p => p.test(path))) return true;
 
-    // Heuristic: last segment looks like an article slug (contains hyphens, 20+ chars)
     const lastSegment = segments[segments.length - 1];
     if (lastSegment.includes('-') && lastSegment.length >= 20) return true;
-
-    // Has at least 3 path segments (e.g. /section/subsection/article-slug)
     if (segments.length >= 3) return true;
 
     return false;
@@ -57,11 +85,9 @@ function isArticleUrl(href) {
   }
 }
 
-// Check if an element is in or near the current viewport
 function isInViewport(el) {
   const rect = el.getBoundingClientRect();
   if (rect.width === 0 && rect.height === 0) return false;
-
   const viewHeight = window.innerHeight;
   const buffer = viewHeight * 0.5;
   return rect.top < viewHeight + buffer && rect.bottom > -buffer;
@@ -76,32 +102,40 @@ function getMatchingPrefixes() {
   });
 }
 
-// Collect viewport links that haven't been checked yet
+// --- Link collection ---
 async function collectNewLinks() {
   const prefixes = await getMatchingPrefixes();
   const allLinks = document.querySelectorAll('a[href]');
   const urlToElements = new Map();
 
+  let totalMatched = 0;
+  let skippedViewport = 0;
+  let skippedArticle = 0;
+  let skippedChecked = 0;
+
   for (const link of allLinks) {
     const href = link.href;
     if (!prefixes.some(prefix => href.includes(prefix))) continue;
-    if (!isInViewport(link)) continue;
-    if (!isArticleUrl(href)) continue;
+    totalMatched++;
+
+    if (!isInViewport(link)) { skippedViewport++; continue; }
+    if (!isArticleUrl(href)) { skippedArticle++; continue; }
 
     const canon = canonicalPath(href);
-    if (checkedUrls.has(canon)) {
-      // Already checked — but still inject indicator if this element doesn't have one
-      continue;
-    }
+    if (checkedUrls.has(canon)) { skippedChecked++; continue; }
+
     if (!urlToElements.has(canon)) {
       urlToElements.set(canon, { url: href, elements: [] });
     }
     urlToElements.get(canon).elements.push(link);
   }
 
+  console.log(`[Archive.today] Link collection: ${totalMatched} prefix-matched, ${skippedViewport} outside viewport, ${skippedArticle} non-article, ${skippedChecked} already checked, ${urlToElements.size} to scan`);
+
   return [...urlToElements.values()];
 }
 
+// --- Scanning ---
 async function scanPage() {
   if (scanInProgress) {
     console.log('[Archive.today] Scan already in progress, skipping.');
@@ -111,11 +145,15 @@ async function scanPage() {
 
   try {
     const entries = await collectNewLinks();
-    console.log(`[Archive.today] Found ${entries.length} new links to check (${checkedUrls.size} already checked).`);
     if (entries.length === 0) {
       scanInProgress = false;
       return;
     }
+
+    let checked = 0;
+    let found = 0;
+
+    updateBadge(`Scanning... 0/${entries.length}`, '...');
 
     for (const entry of entries) {
       const canon = canonicalPath(entry.url);
@@ -133,7 +171,7 @@ async function scanPage() {
         checkedUrls.add(canon);
 
         if (snapshotUrl) {
-          // Inject for the elements we collected, plus any other matching links on the page
+          found++;
           const allLinks = document.querySelectorAll('a[href]');
           for (const link of allLinks) {
             if (canonicalPath(link.href) === canon) {
@@ -144,7 +182,14 @@ async function scanPage() {
       } catch (e) {
         console.error('Archive.today scan error for', entry.url, e);
       }
+
+      checked++;
+      updateBadge(`Scanning... ${checked}/${entries.length} (${found} found)`, found || '...');
     }
+
+    console.log(`[Archive.today] Scan complete: ${found}/${entries.length} archived.`);
+    updateBadge(`${found} archived`, found);
+    setTimeout(hideBadge, 5000);
   } finally {
     scanInProgress = false;
   }
@@ -167,8 +212,7 @@ function injectIndicator(link, snapshotUrl) {
   link.insertAdjacentElement('afterend', indicator);
 }
 
-// Detect viewport changes by polling document.documentElement.getBoundingClientRect().top
-// This value changes as the page scrolls regardless of scrolling implementation.
+// --- Scroll detection via polling ---
 let pollInterval = null;
 let lastDocTop = 0;
 
@@ -182,7 +226,6 @@ function startScrollDetection() {
     const threshold = window.innerHeight * 0.5;
 
     if (delta > 10) {
-      // Some movement detected — log it even if below threshold
       console.log(`[Archive.today] Poll: docTop=${Math.round(docTop)}, last=${Math.round(lastDocTop)}, delta=${Math.round(delta)}, threshold=${Math.round(threshold)}`);
     }
 
@@ -201,10 +244,12 @@ function stopScrollDetection() {
   }
 }
 
-// Initialize auto-scan if enabled
+// --- Init ---
 async function initAutoScan() {
-  const data = await chrome.storage.sync.get({ autoScan: false });
-  console.log('[Archive.today] Auto-scan setting:', data.autoScan);
+  const data = await chrome.storage.sync.get({ autoScan: false, showProgress: false });
+  showProgress = data.showProgress;
+  console.log('[Archive.today] Settings:', { autoScan: data.autoScan, showProgress: data.showProgress });
+  console.log('[Archive.today] Page hostname:', location.hostname);
   if (data.autoScan) {
     console.log('[Archive.today] Auto-scan enabled, running initial scan.');
     scanPage();
@@ -212,14 +257,19 @@ async function initAutoScan() {
   }
 }
 
-// Listen for setting changes (e.g. user toggles auto-scan in popup)
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'sync' && changes.autoScan) {
-    if (changes.autoScan.newValue) {
-      scanPage();
-      startScrollDetection();
-    } else {
-      stopScrollDetection();
+  if (area === 'sync') {
+    if (changes.autoScan) {
+      if (changes.autoScan.newValue) {
+        scanPage();
+        startScrollDetection();
+      } else {
+        stopScrollDetection();
+      }
+    }
+    if (changes.showProgress) {
+      showProgress = changes.showProgress.newValue;
+      if (!showProgress) hideBadge();
     }
   }
 });
