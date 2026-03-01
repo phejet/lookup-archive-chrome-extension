@@ -1,4 +1,4 @@
-# Archive.today Lookup — Chrome Extension
+# Archive Lookup — Chrome Extension
 
 [![Lint & Format](https://github.com/phejet/lookup-archive-chrome-extension/actions/workflows/lint.yml/badge.svg)](https://github.com/phejet/lookup-archive-chrome-extension/actions/workflows/lint.yml)
 [![Tests](https://github.com/phejet/lookup-archive-chrome-extension/actions/workflows/test.yml/badge.svg)](https://github.com/phejet/lookup-archive-chrome-extension/actions/workflows/test.yml)

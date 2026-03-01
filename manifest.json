@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Archive.today Lookup",
+  "name": "Archive Lookup",
   "version": "1.0",
-  "description": "Quickly look up archived snapshots of articles on archive.today",
+  "description": "Quickly look up archived snapshots of articles",
   "permissions": ["contextMenus", "storage", "activeTab"],
   "host_permissions": [
     "https://archive.today/*",
