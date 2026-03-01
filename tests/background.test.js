@@ -79,12 +79,52 @@ describe('setCache', () => {
   });
 });
 
+describe('extractSnapshotUrl', () => {
+  test('extracts URL from meta-refresh redirect', () => {
+    const html =
+      '<html><head><meta http-equiv="refresh" content="0;url=https://archive.today/2024/https://example.com"></head></html>';
+    expect(mod.extractSnapshotUrl(html)).toBe(
+      'https://archive.today/2024/https://example.com',
+    );
+  });
+
+  test('extracts URL from location.href assignment', () => {
+    const html = '<script>location.href = "https://archive.is/abc123";</script>';
+    expect(mod.extractSnapshotUrl(html)).toBe('https://archive.is/abc123');
+  });
+
+  test('extracts URL from location.replace()', () => {
+    const html = '<script>location.replace("https://archive.ph/2025/https://example.com");</script>';
+    expect(mod.extractSnapshotUrl(html)).toBe(
+      'https://archive.ph/2025/https://example.com',
+    );
+  });
+
+  test('returns null for search/submit page with no snapshot', () => {
+    const html =
+      '<html><body><form action="/submit"><input name="url"></form></body></html>';
+    expect(mod.extractSnapshotUrl(html)).toBeNull();
+  });
+
+  test('returns null when redirect targets non-archive domain', () => {
+    const html = '<script>location.href = "https://evil.com/2024/https://example.com";</script>';
+    expect(mod.extractSnapshotUrl(html)).toBeNull();
+  });
+
+  test('returns null when redirect URL contains /newest/', () => {
+    const html =
+      '<meta http-equiv="refresh" content="0;url=https://archive.today/newest/https://example.com">';
+    expect(mod.extractSnapshotUrl(html)).toBeNull();
+  });
+});
+
 describe('checkArchive', () => {
   test('returns snapshot URL on valid redirect', async () => {
     chrome.storage.local.get.mockResolvedValue({});
     fetch.mockResolvedValue({
       ok: true,
       url: 'https://archive.today/2024/https://example.com/article',
+      text: vi.fn().mockResolvedValue(''),
     });
     const result = await mod.checkArchive('https://example.com/article');
     expect(result).toBe('https://archive.today/2024/https://example.com/article');
@@ -96,6 +136,7 @@ describe('checkArchive', () => {
     fetch.mockResolvedValue({
       ok: true,
       url: 'https://archive.today/newest/https://example.com/article',
+      text: vi.fn().mockResolvedValue('<html><body>No results</body></html>'),
     });
     const result = await mod.checkArchive('https://example.com/article');
     expect(result).toBeNull();
@@ -113,6 +154,7 @@ describe('checkArchive', () => {
     fetch.mockResolvedValue({
       ok: true,
       url: 'https://evil.com/2024/https://example.com/article',
+      text: vi.fn().mockResolvedValue(''),
     });
     const result = await mod.checkArchive('https://example.com/article');
     expect(result).toBeNull();
@@ -135,11 +177,37 @@ describe('checkArchive', () => {
       fetch.mockResolvedValue({
         ok: true,
         url: `https://${domain}/2024/https://example.com`,
+        text: vi.fn().mockResolvedValue(''),
       });
       const freshMod = await import('../background.js');
       const result = await freshMod.checkArchive('https://example.com');
       expect(result).toBe(`https://${domain}/2024/https://example.com`);
     }
+  });
+
+  test('falls back to meta-refresh body parsing when URL check fails', async () => {
+    chrome.storage.local.get.mockResolvedValue({});
+    const html =
+      '<html><head><meta http-equiv="refresh" content="0;url=https://archive.today/2024/https://example.com/article"></head></html>';
+    fetch.mockResolvedValue({
+      ok: true,
+      url: 'https://archive.today/newest/https://example.com/article',
+      text: vi.fn().mockResolvedValue(html),
+    });
+    const result = await mod.checkArchive('https://example.com/article');
+    expect(result).toBe('https://archive.today/2024/https://example.com/article');
+  });
+
+  test('falls back to JS redirect body parsing when URL check fails', async () => {
+    chrome.storage.local.get.mockResolvedValue({});
+    const html = '<script>location.href = "https://archive.is/abc123";</script>';
+    fetch.mockResolvedValue({
+      ok: true,
+      url: 'https://archive.today/newest/https://example.com/article',
+      text: vi.fn().mockResolvedValue(html),
+    });
+    const result = await mod.checkArchive('https://example.com/article');
+    expect(result).toBe('https://archive.is/abc123');
   });
 });
 
@@ -181,6 +249,7 @@ describe('checkBatch', () => {
     fetch.mockResolvedValue({
       ok: true,
       url: 'https://archive.today/2024/https://uncached.com',
+      text: vi.fn().mockResolvedValue(''),
     });
 
     const results = await mod.checkBatch(['https://cached.com', 'https://uncached.com']);

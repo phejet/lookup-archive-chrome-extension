@@ -90,6 +90,36 @@ async function checkBatch(urls) {
   return results;
 }
 
+function extractSnapshotUrl(html) {
+  const patterns = [
+    // meta http-equiv="refresh" redirect
+    /<meta[^>]+http-equiv=["']?refresh["']?[^>]+content=["'][^"']*;\s*url=([^"'\s>]+)/i,
+    // JS location.href assignment
+    /location\.href\s*=\s*["']([^"']+)["']/,
+    // JS location.replace()
+    /location\.replace\s*\(\s*["']([^"']+)["']\s*\)/,
+    // JS window.location assignment
+    /window\.location\s*=\s*["']([^"']+)["']/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match) {
+      const candidate = match[1];
+      if (candidate.includes('/newest/')) continue;
+      try {
+        const hostname = new URL(candidate).hostname;
+        if (ARCHIVE_DOMAINS.some((d) => hostname === d || hostname.endsWith('.' + d))) {
+          return candidate;
+        }
+      } catch {
+        continue;
+      }
+    }
+  }
+  return null;
+}
+
 // Check if a URL has an archived snapshot by following the redirect and inspecting the final URL.
 // archive.today/newest/<url> redirects to a timestamped snapshot like archive.today/2024/https://...
 // If no snapshot exists, the final URL stays on archive.today/newest/ or shows a search/submit page.
@@ -113,6 +143,12 @@ async function checkArchive(url) {
       if (ARCHIVE_DOMAINS.some((d) => finalHostname === d || finalHostname.endsWith('.' + d))) {
         snapshotUrl = finalUrl;
       }
+    }
+
+    // Fallback: parse response body for JS/meta-refresh redirects
+    if (!snapshotUrl && response.ok) {
+      const body = await response.text();
+      snapshotUrl = extractSnapshotUrl(body);
     }
   } catch (e) {
     console.error('Archive.today lookup failed for', url, e);
@@ -142,5 +178,13 @@ async function setCache(url, snapshotUrl) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { cacheKey, getCached, setCache, checkArchive, checkBatch, checkBatchCacheOnly };
+  module.exports = {
+    cacheKey,
+    getCached,
+    setCache,
+    checkArchive,
+    checkBatch,
+    checkBatchCacheOnly,
+    extractSnapshotUrl,
+  };
 }
