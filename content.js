@@ -13,9 +13,16 @@ const iconTemplate = (() => {
 
 const checkedUrls = new Set();
 let isAutoScan = false;
+let autoScanSites = [];
 let showOnDemandProgress = false;
 let debugLogging = false;
 let currentScanIsManual = false;
+
+function isCurrentSiteAllowed() {
+  if (autoScanSites.length === 0) return false;
+  const hostname = location.hostname;
+  return autoScanSites.some(site => hostname === site || hostname.endsWith('.' + site));
+}
 
 function debugLog(...args) {
   if (debugLogging) console.log('[Archive.today]', ...args);
@@ -477,11 +484,12 @@ function stopScrollDetection() {
 
 // --- Init ---
 async function init() {
-  const data = await chrome.storage.sync.get({ autoScan: false, showOnDemandProgress: false, debugLogging: false });
+  const data = await chrome.storage.sync.get({ autoScan: false, autoScanSites: [], showOnDemandProgress: false, debugLogging: false });
   isAutoScan = data.autoScan;
+  autoScanSites = data.autoScanSites;
   showOnDemandProgress = data.showOnDemandProgress;
   debugLogging = data.debugLogging;
-  if (isAutoScan) {
+  if (isAutoScan && isCurrentSiteAllowed()) {
     currentScanIsManual = false;
     scanStartTime = performance.now();
     scanPage();
@@ -491,9 +499,12 @@ async function init() {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'sync') {
-    if (changes.autoScan) {
-      isAutoScan = changes.autoScan.newValue;
-      if (isAutoScan) {
+    if (changes.autoScanSites) {
+      autoScanSites = changes.autoScanSites.newValue;
+    }
+    if (changes.autoScan || changes.autoScanSites) {
+      if (changes.autoScan) isAutoScan = changes.autoScan.newValue;
+      if (isAutoScan && isCurrentSiteAllowed()) {
         currentScanIsManual = false;
         scanStartTime = performance.now();
         scanPage();

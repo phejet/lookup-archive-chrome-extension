@@ -5,7 +5,8 @@
   "description": "Quickly look up archived snapshots of articles on archive.today",
   "permissions": [
     "contextMenus",
-    "storage"
+    "storage",
+    "activeTab"
   ],
   "host_permissions": [
     "https://archive.today/*",

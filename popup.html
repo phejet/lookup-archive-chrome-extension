@@ -63,6 +63,84 @@
     }
     .switch input:checked + .slider { background: #1a73e8; }
     .switch input:checked + .slider::before { transform: translateX(16px); }
+
+    .site-list-section {
+      padding: 10px 0;
+      border-top: 1px solid #eee;
+    }
+    .site-list-header {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+    .site-list-desc {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 8px;
+    }
+    .site-input-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .site-input-row input {
+      flex: 1;
+      padding: 4px 8px;
+      font-size: 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      outline: none;
+    }
+    .site-input-row input:focus {
+      border-color: #1a73e8;
+    }
+    .btn {
+      padding: 4px 10px;
+      font-size: 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #f8f8f8;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn:hover {
+      background: #eee;
+    }
+    .btn-current {
+      width: 100%;
+      margin-bottom: 8px;
+    }
+    .site-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .site-list li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 0;
+      font-size: 12px;
+    }
+    .site-list li + li {
+      border-top: 1px solid #f0f0f0;
+    }
+    .site-remove {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #999;
+      font-size: 14px;
+      padding: 0 4px;
+      line-height: 1;
+    }
+    .site-remove:hover {
+      color: #e53935;
+    }
+    .site-empty {
+      font-size: 12px;
+      color: #999;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -77,6 +155,17 @@
       <input type="checkbox" id="auto-scan" aria-label="Enable auto-scan">
       <span class="slider"></span>
     </label>
+  </div>
+  <div class="site-list-section" id="site-list-section">
+    <div class="site-list-header">Auto-scan sites</div>
+    <div class="site-list-desc">Only auto-scan on these domains</div>
+    <div class="site-input-row">
+      <input type="text" id="site-input" placeholder="e.g. nytimes.com">
+      <button class="btn" id="add-site-btn">Add</button>
+    </div>
+    <button class="btn btn-current" id="add-current-site-btn">Add current site</button>
+    <ul class="site-list" id="site-list"></ul>
+    <div class="site-empty" id="site-empty">No sites configured. Auto-scan is disabled until you add sites.</div>
   </div>
   <div class="toggle-row">
     <div>
