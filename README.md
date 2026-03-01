@@ -1,6 +1,6 @@
 # Archive.today Lookup — Chrome Extension
 
-A Chrome extension that checks [archive.today](https://archive.today) for archived snapshots of news articles. Useful for reading paywalled content that has already been archived.
+A Chrome extension for quickly looking up archived snapshots of web pages on [archive.today](https://archive.today). Handy for researchers, journalists, and anyone who wants to check if a page has been preserved in a web archive.
 
 ## Features
 
@@ -12,9 +12,9 @@ A Chrome extension that checks [archive.today](https://archive.today) for archiv
 
 ## How it works
 
-The extension uses archive.today's `/newest/<url>` endpoint, which redirects to the most recent snapshot of a given URL. For single lookups it opens this directly in a new tab. For page scans it fetches the endpoint in the background to check if a snapshot exists, then injects indicator icons into the page.
+The extension uses archive.today's `/newest/<url>` endpoint, which redirects to the most recent archived snapshot of a given URL. For single lookups it opens this directly in a new tab. For page scans it checks the endpoint in the background and injects small indicator icons next to links that have archived snapshots.
 
-## Install locally
+## Install
 
 1. Clone or download this repository
 2. Open Chrome and go to `chrome://extensions`
@@ -27,15 +27,4 @@ The extension uses archive.today's `/newest/<url>` endpoint, which redirects to 
 1. Click the extension icon in the toolbar
 2. Add URL prefixes for sites you want to scan (e.g. `afr.com`)
 3. Navigate to a page with links to those sites
-4. Right-click → **"Scan page for archives"** to find archived articles
-
-## Files
-
-```
-manifest.json   — Chrome extension manifest (Manifest V3)
-background.js   — Service worker: context menus, archive.today lookups, caching
-content.js      — Content script: page scanning, link filtering, icon injection
-popup.html/js   — Settings popup for managing URL prefixes
-styles.css      — Styles for injected archive indicators and status banner
-icons/          — Extension icons (16, 48, 128px)
-```
+4. Right-click → **"Scan page for archives"** to find archived snapshots
