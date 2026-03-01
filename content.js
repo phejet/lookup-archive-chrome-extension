@@ -320,7 +320,7 @@ function updateBanner() {
   ];
   if (stats.errors > 0) parts.push(`${stats.errors} errors`);
   if (inFlight > 0) parts.push(`${inFlight} checking`);
-  showStatus(`Scanning... ${parts.join(' | ')}`);
+  showStatus(`Scanning for archived articles... ${parts.join(' | ')}`);
 }
 
 function showScanComplete() {
@@ -335,7 +335,7 @@ function showScanComplete() {
   const summary = `Scan done: ${parts.join(', ')}`;
   debugLog(summary);
   showStatus(summary);
-  scheduleFade(5000);
+  scheduleFade(2000);
   currentScanIsManual = false;
 }
 
@@ -470,6 +470,13 @@ async function scanPage() {
 
   // Batch resolve cached items before spinning up workers
   await resolveCachedItems();
+
+  // If everything was resolved from cache, no workers will spawn
+  if (!hasPendingItems() && activeWorkers === 0) {
+    showScanComplete();
+    cleanupDoneItems();
+    return;
+  }
 
   // Spin up workers for remaining uncached items
   ensureWorkers();
