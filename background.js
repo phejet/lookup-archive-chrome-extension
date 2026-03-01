@@ -38,7 +38,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     checkBatch(message.urls).then(sendResponse).catch(() => sendResponse({}));
     return true;
   }
+  if (message.action === 'check-batch-cache-only') {
+    checkBatchCacheOnly(message.urls).then(sendResponse).catch(() => sendResponse({}));
+    return true;
+  }
 });
+
+async function checkBatchCacheOnly(urls) {
+  const keys = urls.map(cacheKey);
+  const cacheData = await chrome.storage.local.get(keys);
+  const now = Date.now();
+  const results = {};
+  for (const url of urls) {
+    const entry = cacheData[cacheKey(url)];
+    if (entry && now - entry.timestamp <= CACHE_TTL_MS) {
+      results[url] = entry.snapshotUrl;
+    }
+  }
+  return results;
+}
 
 async function checkBatch(urls) {
   // Fetch all cache entries in a single storage read

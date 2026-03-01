@@ -12,16 +12,22 @@ const iconTemplate = (() => {
 })();
 
 const checkedUrls = new Set();
-let scanInProgress = false;
 let isAutoScan = false;
 let showOnDemandProgress = false;
 let debugLogging = false;
-// Track whether current scan was triggered manually (on-demand)
 let currentScanIsManual = false;
 
 function debugLog(...args) {
   if (debugLogging) console.log('[Archive.today]', ...args);
 }
+
+// --- Priority queue + worker pool state ---
+const queue = new Map();       // canon -> { url, canon, elements[], state: 'pending'|'in-flight'|'done' }
+let activeWorkers = 0;
+const MAX_WORKERS = 5;
+let stats = { queued: 0, checked: 0, found: 0, notFound: 0, errors: 0 };
+let scanStartTime = 0;
+
 // Track fade timeout so we can cancel overlapping fades
 let fadeTimeoutId = null;
 
@@ -79,6 +85,9 @@ function hideStatus() {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'scan-page') {
     currentScanIsManual = true;
+    // Reset stats for fresh banner on manual scan
+    stats = { queued: 0, checked: 0, found: 0, notFound: 0, errors: 0 };
+    scanStartTime = performance.now();
     scanPage();
   }
 });
@@ -172,92 +181,100 @@ function sendMessageWithTimeout(msg, timeoutMs = 20000) {
   ]);
 }
 
-// --- Scanning ---
-let rescanQueued = false;
+// --- Priority + queue helpers ---
 
-async function scanPage() {
-  if (scanInProgress) {
-    rescanQueued = true;
-    debugLog('Scan in progress, queued re-scan.');
-    return;
+function distanceFromViewportCenter(elements) {
+  const centerY = window.innerHeight / 2;
+  let minDist = Infinity;
+  for (const el of elements) {
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) continue;
+    const elCenterY = (rect.top + rect.bottom) / 2;
+    const dist = Math.abs(elCenterY - centerY);
+    if (dist < minDist) minDist = dist;
   }
+  return minDist;
+}
 
-  scanInProgress = true;
-  rescanQueued = false;
-
-  try {
-    const entries = collectNewLinks();
-    if (entries.length === 0) {
-      debugLog('No new links to scan.');
-      showStatus('No new article links to scan.');
-      scheduleFade(3000);
-      return;
-    }
-
-    const scanStart = performance.now();
-    debugLog('Starting scan of ' + entries.length + ' links.');
-    showStatus(`Scanning ${entries.length} links... (0/${entries.length})`);
-
-    let checked = 0;
-    let found = 0;
-    let notFound = 0;
-    let errors = 0;
-    let skipped = 0;
-
-    for (const entry of entries) {
-      // If a re-scan is queued, stop scanning out-of-viewport items
-      if (rescanQueued) {
-        skipped = entries.length - checked;
-        debugLog('Re-scan queued, skipping remaining ' + skipped + ' of ' + entries.length);
-        break;
-      }
-
-      const canon = canonicalPath(entry.url);
-      try {
-        const t0 = performance.now();
-        const snapshotUrl = await sendMessageWithTimeout({ action: 'check-single', url: entry.url });
-        debugLog('check-single took ' + Math.round(performance.now() - t0) + 'ms for ' + entry.url + ' → ' + (snapshotUrl ? 'found' : 'not found'));
-
-        checkedUrls.add(canon);
-
-        if (snapshotUrl) {
-          found++;
-          const freshLinks = document.querySelectorAll('a[href]:not(.archive-today-indicator)');
-          for (const link of freshLinks) {
-            if (canonicalPath(link.href) === canon) {
-              injectIndicator(link, snapshotUrl);
-            }
-          }
-        } else {
-          notFound++;
+function enqueueLinks(entries) {
+  let added = 0;
+  for (const entry of entries) {
+    const canon = canonicalPath(entry.url);
+    if (queue.has(canon)) {
+      // Merge elements into existing queue item
+      const existing = queue.get(canon);
+      for (const el of entry.elements) {
+        if (!existing.elements.includes(el)) {
+          existing.elements.push(el);
         }
-      } catch (e) {
-        console.error('Archive.today scan error for', entry.url, e);
-        errors++;
       }
-
-      checked++;
-      let statusParts = [`${checked}/${entries.length}`, `${found} archived`, `${notFound} not found`];
-      if (errors > 0) statusParts.push(`${errors} errors`);
-      showStatus(`Scanning... ${statusParts.join(' | ')}`);
+    } else {
+      queue.set(canon, {
+        url: entry.url,
+        canon,
+        elements: [...entry.elements],
+        state: 'pending'
+      });
+      added++;
+      stats.queued++;
     }
+  }
+  return added;
+}
 
-    let summaryParts = [`${checked} checked`, `${found} archived`, `${notFound} not found`];
-    if (errors > 0) summaryParts.push(`${errors} errors`);
-    if (skipped > 0) summaryParts.push(`${skipped} skipped`);
-    const elapsed = Math.round(performance.now() - scanStart);
-    summaryParts.push(`${elapsed}ms`);
-    const summary = `Scan done: ${summaryParts.join(', ')}`;
-    debugLog(summary);
-    showStatus(summary);
-    scheduleFade(5000);
-  } finally {
-    scanInProgress = false;
-    currentScanIsManual = false;
-    if (rescanQueued) {
-      rescanQueued = false;
-      debugLog('Running queued re-scan.');
-      scanPage();
+function pickNextItem() {
+  let best = null;
+  let bestDist = Infinity;
+  for (const item of queue.values()) {
+    if (item.state !== 'pending') continue;
+    const dist = distanceFromViewportCenter(item.elements);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = item;
+    }
+  }
+  if (best) {
+    best.state = 'in-flight';
+    debugLog('Picked item for processing:', best.url, 'distance:', Math.round(bestDist));
+  }
+  return best;
+}
+
+function countPending() {
+  let count = 0;
+  for (const item of queue.values()) {
+    if (item.state === 'pending') count++;
+  }
+  return count;
+}
+
+function countInFlight() {
+  let count = 0;
+  for (const item of queue.values()) {
+    if (item.state === 'in-flight') count++;
+  }
+  return count;
+}
+
+function hasPendingItems() {
+  for (const item of queue.values()) {
+    if (item.state === 'pending') return true;
+  }
+  return false;
+}
+
+function cleanupDoneItems() {
+  for (const [canon, item] of queue) {
+    if (item.state === 'done') queue.delete(canon);
+  }
+}
+
+// --- Inject indicators for a canonical URL ---
+function injectIndicatorsForCanon(canon, snapshotUrl) {
+  const freshLinks = document.querySelectorAll('a[href]:not(.archive-today-indicator)');
+  for (const link of freshLinks) {
+    if (canonicalPath(link.href) === canon) {
+      injectIndicator(link, snapshotUrl);
     }
   }
 }
@@ -283,6 +300,149 @@ function injectIndicator(link, snapshotUrl) {
   link.insertAdjacentElement('afterend', indicator);
 }
 
+// --- Banner updates ---
+function updateBanner() {
+  const inFlight = countInFlight();
+  const parts = [
+    `${stats.checked}/${stats.queued}`,
+    `${stats.found} archived`,
+    `${stats.notFound} not found`
+  ];
+  if (stats.errors > 0) parts.push(`${stats.errors} errors`);
+  if (inFlight > 0) parts.push(`${inFlight} checking`);
+  showStatus(`Scanning... ${parts.join(' | ')}`);
+}
+
+function showScanComplete() {
+  const elapsed = Math.round(performance.now() - scanStartTime);
+  const parts = [
+    `${stats.checked} checked`,
+    `${stats.found} archived`,
+    `${stats.notFound} not found`
+  ];
+  if (stats.errors > 0) parts.push(`${stats.errors} errors`);
+  parts.push(`${elapsed}ms`);
+  const summary = `Scan done: ${parts.join(', ')}`;
+  debugLog(summary);
+  showStatus(summary);
+  scheduleFade(5000);
+  currentScanIsManual = false;
+}
+
+// --- Worker function ---
+async function worker() {
+  activeWorkers++;
+  debugLog('Worker started. Active workers:', activeWorkers);
+  try {
+    while (true) {
+      const item = pickNextItem();
+      if (!item) break;
+      try {
+        const t0 = performance.now();
+        const snapshotUrl = await sendMessageWithTimeout({ action: 'check-single', url: item.url });
+        debugLog('check-single took ' + Math.round(performance.now() - t0) + 'ms for ' + item.url + ' → ' + (snapshotUrl ? 'found' : 'not found'));
+
+        checkedUrls.add(item.canon);
+        item.state = 'done';
+
+        if (snapshotUrl) {
+          stats.found++;
+          injectIndicatorsForCanon(item.canon, snapshotUrl);
+        } else {
+          stats.notFound++;
+        }
+      } catch (e) {
+        console.error('Archive.today scan error for', item.url, e);
+        item.state = 'done';
+        stats.errors++;
+      }
+      stats.checked++;
+      updateBanner();
+    }
+  } finally {
+    activeWorkers--;
+    debugLog('Worker finished. Active workers:', activeWorkers);
+    if (activeWorkers === 0 && !hasPendingItems()) {
+      showScanComplete();
+      cleanupDoneItems();
+    }
+  }
+}
+
+function ensureWorkers() {
+  const pending = countPending();
+  const toSpawn = Math.min(MAX_WORKERS - activeWorkers, pending);
+  debugLog('ensureWorkers: pending=' + pending + ' active=' + activeWorkers + ' spawning=' + toSpawn);
+  for (let i = 0; i < toSpawn; i++) {
+    worker(); // fire-and-forget
+  }
+}
+
+// --- Batch cache pre-resolution ---
+async function resolveCachedItems() {
+  const pendingItems = [];
+  for (const item of queue.values()) {
+    if (item.state === 'pending') pendingItems.push(item);
+  }
+  if (pendingItems.length === 0) return;
+
+  const urls = pendingItems.map(item => item.url);
+  try {
+    const t0 = performance.now();
+    const cached = await sendMessageWithTimeout(
+      { action: 'check-batch-cache-only', urls },
+      10000
+    );
+    debugLog('Batch cache lookup took ' + Math.round(performance.now() - t0) + 'ms, resolved ' + Object.keys(cached).length + '/' + urls.length + ' from cache');
+
+    for (const item of pendingItems) {
+      if (item.url in cached) {
+        const snapshotUrl = cached[item.url];
+        checkedUrls.add(item.canon);
+        item.state = 'done';
+        stats.checked++;
+        if (snapshotUrl) {
+          stats.found++;
+          injectIndicatorsForCanon(item.canon, snapshotUrl);
+        } else {
+          stats.notFound++;
+        }
+      }
+    }
+    updateBanner();
+  } catch (e) {
+    debugLog('Batch cache lookup failed, workers will handle all items:', e);
+  }
+}
+
+// --- Scanning ---
+async function scanPage() {
+  const entries = collectNewLinks();
+  if (entries.length === 0) {
+    debugLog('No new links to scan.');
+    if (currentScanIsManual && activeWorkers === 0) {
+      showStatus('No new article links to scan.');
+      scheduleFade(3000);
+    }
+    return;
+  }
+
+  if (scanStartTime === 0) scanStartTime = performance.now();
+
+  const added = enqueueLinks(entries);
+  debugLog('Enqueued ' + added + ' new links (' + entries.length + ' collected, ' + queue.size + ' total in queue)');
+
+  if (added === 0) return;
+
+  updateBanner();
+
+  // Batch resolve cached items before spinning up workers
+  await resolveCachedItems();
+
+  // Spin up workers for remaining uncached items
+  ensureWorkers();
+}
+
 // --- Scroll detection via scroll event ---
 let scrollListening = false;
 let lastScanScrollY = 0;
@@ -292,8 +452,7 @@ function onScroll() {
   const delta = Math.abs(currentY - lastScanScrollY);
   const threshold = window.innerHeight * 0.25;
   if (delta >= threshold) {
-    const pending = collectNewLinks();
-    debugLog('Scroll threshold met, triggering re-scan. delta=' + Math.round(delta) + ' threshold=' + Math.round(threshold) + ' pendingLinks=' + pending.length + ' checkedTotal=' + checkedUrls.size);
+    debugLog('Scroll threshold met, triggering scan. delta=' + Math.round(delta) + ' threshold=' + Math.round(threshold) + ' checkedTotal=' + checkedUrls.size);
     lastScanScrollY = currentY;
     currentScanIsManual = false;
     scanPage();
@@ -324,6 +483,7 @@ async function init() {
   debugLogging = data.debugLogging;
   if (isAutoScan) {
     currentScanIsManual = false;
+    scanStartTime = performance.now();
     scanPage();
     startScrollDetection();
   }
@@ -335,6 +495,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
       isAutoScan = changes.autoScan.newValue;
       if (isAutoScan) {
         currentScanIsManual = false;
+        scanStartTime = performance.now();
         scanPage();
         startScrollDetection();
       } else {
