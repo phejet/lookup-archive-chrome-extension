@@ -30,12 +30,13 @@ function showStatus(text) {
 
 function fadeAndHideStatus() {
   if (!statusBanner) return;
-  statusBanner.style.opacity = '0';
-  setTimeout(() => {
-    if (statusBanner) {
-      statusBanner.style.display = 'none';
-    }
-  }, 1000);
+  const anim = statusBanner.animate(
+    [{ opacity: 0.85 }, { opacity: 0 }],
+    { duration: 1000, fill: 'forwards' }
+  );
+  anim.onfinish = () => {
+    if (statusBanner) statusBanner.style.display = 'none';
+  };
 }
 
 function hideStatus() {
