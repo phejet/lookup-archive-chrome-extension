@@ -34,7 +34,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     checkArchive(message.url).then(sendResponse).catch(() => sendResponse(null));
     return true;
   }
+  if (message.action === 'check-batch') {
+    checkBatch(message.urls).then(sendResponse).catch(() => sendResponse({}));
+    return true;
+  }
 });
+
+async function checkBatch(urls) {
+  // Fetch all cache entries in a single storage read
+  const keys = urls.map(cacheKey);
+  const cacheData = await chrome.storage.local.get(keys);
+  const now = Date.now();
+
+  const results = {};
+  const uncachedUrls = [];
+
+  for (const url of urls) {
+    const entry = cacheData[cacheKey(url)];
+    if (entry && now - entry.timestamp <= CACHE_TTL_MS) {
+      results[url] = entry.snapshotUrl;
+    } else {
+      uncachedUrls.push(url);
+    }
+  }
+
+  // Only fetch uncached URLs (sequentially to respect rate limits)
+  for (const url of uncachedUrls) {
+    results[url] = await checkArchive(url);
+  }
+
+  return results;
+}
 
 // Check if a URL has an archived snapshot by following the redirect and inspecting the final URL.
 // archive.today/newest/<url> redirects to a timestamped snapshot like archive.today/2024/https://...

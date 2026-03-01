@@ -15,8 +15,13 @@ const checkedUrls = new Set();
 let scanInProgress = false;
 let isAutoScan = false;
 let showOnDemandProgress = false;
+let debugLogging = false;
 // Track whether current scan was triggered manually (on-demand)
 let currentScanIsManual = false;
+
+function debugLog(...args) {
+  if (debugLogging) console.log('[Archive.today]', ...args);
+}
 // Track fade timeout so we can cancel overlapping fades
 let fadeTimeoutId = null;
 
@@ -127,7 +132,7 @@ function isInViewport(el) {
 // --- Link collection ---
 function collectNewLinks() {
   const prefixes = [location.hostname];
-  const allLinks = document.querySelectorAll('a[href]');
+  const allLinks = document.querySelectorAll('a[href]:not(.archive-today-indicator)');
   const urlToElements = new Map();
 
   for (const link of allLinks) {
@@ -168,37 +173,56 @@ function sendMessageWithTimeout(msg, timeoutMs = 20000) {
 }
 
 // --- Scanning ---
+let rescanQueued = false;
+
 async function scanPage() {
-  if (scanInProgress) return;
+  if (scanInProgress) {
+    rescanQueued = true;
+    debugLog('Scan in progress, queued re-scan.');
+    return;
+  }
+
   scanInProgress = true;
+  rescanQueued = false;
 
   try {
     const entries = collectNewLinks();
     if (entries.length === 0) {
+      debugLog('No new links to scan.');
       showStatus('No new article links to scan.');
       scheduleFade(3000);
-      scanInProgress = false;
       return;
     }
+
+    const scanStart = performance.now();
+    debugLog('Starting scan of ' + entries.length + ' links.');
+    showStatus(`Scanning ${entries.length} links... (0/${entries.length})`);
 
     let checked = 0;
     let found = 0;
     let notFound = 0;
     let errors = 0;
-
-    showStatus(`Scanning ${entries.length} links... (0/${entries.length})`);
+    let skipped = 0;
 
     for (const entry of entries) {
+      // If a re-scan is queued, stop scanning out-of-viewport items
+      if (rescanQueued) {
+        skipped = entries.length - checked;
+        debugLog('Re-scan queued, skipping remaining ' + skipped + ' of ' + entries.length);
+        break;
+      }
+
       const canon = canonicalPath(entry.url);
       try {
+        const t0 = performance.now();
         const snapshotUrl = await sendMessageWithTimeout({ action: 'check-single', url: entry.url });
+        debugLog('check-single took ' + Math.round(performance.now() - t0) + 'ms for ' + entry.url + ' → ' + (snapshotUrl ? 'found' : 'not found'));
 
         checkedUrls.add(canon);
 
         if (snapshotUrl) {
           found++;
-          // Use elements collected earlier, plus re-query for any added since collection
-          const freshLinks = document.querySelectorAll('a[href]');
+          const freshLinks = document.querySelectorAll('a[href]:not(.archive-today-indicator)');
           for (const link of freshLinks) {
             if (canonicalPath(link.href) === canon) {
               injectIndicator(link, snapshotUrl);
@@ -218,13 +242,23 @@ async function scanPage() {
       showStatus(`Scanning... ${statusParts.join(' | ')}`);
     }
 
-    let summaryParts = [`${checked} scanned`, `${found} archived`, `${notFound} not found`];
+    let summaryParts = [`${checked} checked`, `${found} archived`, `${notFound} not found`];
     if (errors > 0) summaryParts.push(`${errors} errors`);
-    showStatus(`Scan complete: ${summaryParts.join(', ')}`);
+    if (skipped > 0) summaryParts.push(`${skipped} skipped`);
+    const elapsed = Math.round(performance.now() - scanStart);
+    summaryParts.push(`${elapsed}ms`);
+    const summary = `Scan done: ${summaryParts.join(', ')}`;
+    debugLog(summary);
+    showStatus(summary);
     scheduleFade(5000);
   } finally {
     scanInProgress = false;
     currentScanIsManual = false;
+    if (rescanQueued) {
+      rescanQueued = false;
+      debugLog('Running queued re-scan.');
+      scanPage();
+    }
   }
 }
 
@@ -251,27 +285,24 @@ function injectIndicator(link, snapshotUrl) {
 
 // --- Scroll detection via scroll event ---
 let scrollListening = false;
-let lastScrollY = 0;
-let scrollTimeout = null;
+let lastScanScrollY = 0;
 
 function onScroll() {
-  // Debounce: wait until scrolling stops for 500ms, then check delta
-  if (scrollTimeout) clearTimeout(scrollTimeout);
-  scrollTimeout = setTimeout(() => {
-    const currentY = window.scrollY;
-    const delta = Math.abs(currentY - lastScrollY);
-    const threshold = window.innerHeight * 0.5;
-    if (delta >= threshold) {
-      lastScrollY = currentY;
-      currentScanIsManual = false;
-      scanPage();
-    }
-  }, 500);
+  const currentY = window.scrollY;
+  const delta = Math.abs(currentY - lastScanScrollY);
+  const threshold = window.innerHeight * 0.25;
+  if (delta >= threshold) {
+    const pending = collectNewLinks();
+    debugLog('Scroll threshold met, triggering re-scan. delta=' + Math.round(delta) + ' threshold=' + Math.round(threshold) + ' pendingLinks=' + pending.length + ' checkedTotal=' + checkedUrls.size);
+    lastScanScrollY = currentY;
+    currentScanIsManual = false;
+    scanPage();
+  }
 }
 
 function startScrollDetection() {
   if (scrollListening) return;
-  lastScrollY = window.scrollY;
+  lastScanScrollY = window.scrollY;
   window.addEventListener('scroll', onScroll, { passive: true });
   document.addEventListener('scroll', onScroll, { passive: true, capture: true });
   scrollListening = true;
@@ -282,18 +313,15 @@ function stopScrollDetection() {
     window.removeEventListener('scroll', onScroll);
     document.removeEventListener('scroll', onScroll, { capture: true });
     scrollListening = false;
-    if (scrollTimeout) {
-      clearTimeout(scrollTimeout);
-      scrollTimeout = null;
-    }
   }
 }
 
 // --- Init ---
 async function init() {
-  const data = await chrome.storage.sync.get({ autoScan: false, showOnDemandProgress: false });
+  const data = await chrome.storage.sync.get({ autoScan: false, showOnDemandProgress: false, debugLogging: false });
   isAutoScan = data.autoScan;
   showOnDemandProgress = data.showOnDemandProgress;
+  debugLogging = data.debugLogging;
   if (isAutoScan) {
     currentScanIsManual = false;
     scanPage();
@@ -316,6 +344,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if (changes.showOnDemandProgress) {
       showOnDemandProgress = changes.showOnDemandProgress.newValue;
       if (!showOnDemandProgress) hideStatus();
+    }
+    if (changes.debugLogging) {
+      debugLogging = changes.debugLogging.newValue;
     }
   }
 });
