@@ -167,53 +167,37 @@ function injectIndicator(link, snapshotUrl) {
   link.insertAdjacentElement('afterend', indicator);
 }
 
-// Use a sentinel element with IntersectionObserver to detect viewport changes.
-// This works regardless of how the page implements scrolling.
-let sentinel = null;
-let observer = null;
+// Detect viewport changes by polling document.documentElement.getBoundingClientRect().top
+// This value changes as the page scrolls regardless of scrolling implementation.
 let pollInterval = null;
+let lastDocTop = 0;
 
 function startScrollDetection() {
-  // Place a sentinel element at the bottom of the current viewport
-  updateSentinel();
+  lastDocTop = document.documentElement.getBoundingClientRect().top;
+  console.log(`[Archive.today] Scroll detection started. Initial docTop: ${Math.round(lastDocTop)}px`);
 
-  // Poll: check every 1s if viewport has moved significantly
-  // This is a simple, reliable fallback that works on all sites
   pollInterval = setInterval(() => {
-    // Use a sentinel element's position to detect if viewport changed
-    if (!sentinel) return;
-    const rect = sentinel.getBoundingClientRect();
-    // If the sentinel has scrolled well out of view, the viewport has changed
-    if (rect.top < -window.innerHeight * 0.3 || rect.top > window.innerHeight * 1.3) {
-      console.log(`[Archive.today] Viewport change detected (sentinel offset: ${Math.round(rect.top)}px). Triggering re-scan.`);
-      updateSentinel();
+    const docTop = document.documentElement.getBoundingClientRect().top;
+    const delta = Math.abs(docTop - lastDocTop);
+    const threshold = window.innerHeight * 0.5;
+
+    if (delta > 10) {
+      // Some movement detected — log it even if below threshold
+      console.log(`[Archive.today] Poll: docTop=${Math.round(docTop)}, last=${Math.round(lastDocTop)}, delta=${Math.round(delta)}, threshold=${Math.round(threshold)}`);
+    }
+
+    if (delta >= threshold) {
+      console.log(`[Archive.today] Viewport changed enough. Triggering re-scan.`);
+      lastDocTop = docTop;
       scanPage();
     }
   }, 1500);
-
-  console.log('[Archive.today] Scroll detection started (polling).');
-}
-
-function updateSentinel() {
-  if (!sentinel) {
-    sentinel = document.createElement('div');
-    sentinel.id = 'archive-today-sentinel';
-    sentinel.style.cssText = 'position:absolute;width:1px;height:1px;pointer-events:none;opacity:0;z-index:-1;';
-    document.body.appendChild(sentinel);
-  }
-  // Position at the middle of the current viewport
-  const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
-  sentinel.style.top = (scrollY + window.innerHeight * 0.5) + 'px';
 }
 
 function stopScrollDetection() {
   if (pollInterval) {
     clearInterval(pollInterval);
     pollInterval = null;
-  }
-  if (sentinel) {
-    sentinel.remove();
-    sentinel = null;
   }
 }
 
