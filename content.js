@@ -169,20 +169,55 @@ function injectIndicator(link, snapshotUrl) {
   link.insertAdjacentElement('afterend', indicator);
 }
 
+// Get current scroll position (works with both window and document-level scrolling)
+function getScrollY() {
+  return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+}
+
 // Auto-scan: listen for scroll and re-scan when viewport changes significantly
 function onScroll() {
   clearTimeout(scrollTimer);
   scrollTimer = setTimeout(() => {
-    const delta = Math.abs(window.scrollY - lastScrollY);
-    console.log(`[Archive.today] Scroll settled. delta=${Math.round(delta)}px, threshold=${Math.round(window.innerHeight * 0.5)}px`);
-    if (delta < window.innerHeight * 0.5) {
+    const currentY = getScrollY();
+    const delta = Math.abs(currentY - lastScrollY);
+    const threshold = window.innerHeight * 0.5;
+    console.log(`[Archive.today] Scroll settled. scrollY=${Math.round(currentY)}, lastScrollY=${Math.round(lastScrollY)}, delta=${Math.round(delta)}px, threshold=${Math.round(threshold)}px`);
+    if (delta < threshold) {
       console.log('[Archive.today] Scroll delta too small, skipping scan.');
       return;
     }
     console.log('[Archive.today] Triggering re-scan from scroll.');
-    lastScrollY = window.scrollY;
+    lastScrollY = currentY;
     scanPage();
-  }, 500); // debounce 500ms after scroll settles
+  }, 500);
+}
+
+let pendingScan = false;
+
+// Queue a scan — if one is in progress, run another when it finishes
+function requestScan() {
+  if (scanInProgress) {
+    pendingScan = true;
+    return;
+  }
+  scanPage().then(() => {
+    if (pendingScan) {
+      pendingScan = false;
+      scanPage();
+    }
+  });
+}
+
+function attachScrollListeners() {
+  // Listen on multiple targets to handle all scrolling scenarios
+  window.addEventListener('scroll', onScroll, { passive: true });
+  document.addEventListener('scroll', onScroll, { passive: true });
+  console.log('[Archive.today] Scroll listeners attached.');
+}
+
+function detachScrollListeners() {
+  window.removeEventListener('scroll', onScroll);
+  document.removeEventListener('scroll', onScroll);
 }
 
 // Initialize auto-scan if enabled
@@ -190,10 +225,10 @@ async function initAutoScan() {
   const data = await chrome.storage.sync.get({ autoScan: false });
   console.log('[Archive.today] Auto-scan setting:', data.autoScan);
   if (data.autoScan) {
-    lastScrollY = window.scrollY;
-    console.log('[Archive.today] Auto-scan enabled, running initial scan and attaching scroll listener.');
+    lastScrollY = getScrollY();
+    console.log('[Archive.today] Auto-scan enabled, initial scrollY:', Math.round(lastScrollY));
     scanPage();
-    window.addEventListener('scroll', onScroll, { passive: true });
+    attachScrollListeners();
   }
 }
 
@@ -201,11 +236,11 @@ async function initAutoScan() {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'sync' && changes.autoScan) {
     if (changes.autoScan.newValue) {
-      lastScrollY = window.scrollY;
+      lastScrollY = getScrollY();
       scanPage();
-      window.addEventListener('scroll', onScroll, { passive: true });
+      attachScrollListeners();
     } else {
-      window.removeEventListener('scroll', onScroll);
+      detachScrollListeners();
     }
   }
 });
