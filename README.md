@@ -1,6 +1,7 @@
 # Archive.today Lookup — Chrome Extension
 
 [![Lint & Format](https://github.com/phejet/lookup-archive-chrome-extension/actions/workflows/lint.yml/badge.svg)](https://github.com/phejet/lookup-archive-chrome-extension/actions/workflows/lint.yml)
+[![Tests](https://github.com/phejet/lookup-archive-chrome-extension/actions/workflows/test.yml/badge.svg)](https://github.com/phejet/lookup-archive-chrome-extension/actions/workflows/test.yml)
 
 A Chrome extension for quickly looking up archived snapshots of web pages on [archive.today](https://archive.today). Handy for researchers, journalists, and anyone who wants to check if a page has been preserved in a web archive.
 
