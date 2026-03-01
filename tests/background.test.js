@@ -79,64 +79,95 @@ describe('setCache', () => {
   });
 });
 
-describe('extractSnapshotUrl', () => {
-  test('extracts URL from meta-refresh redirect', () => {
-    const html =
-      '<html><head><meta http-equiv="refresh" content="0;url=https://archive.today/2024/https://example.com"></head></html>';
-    expect(mod.extractSnapshotUrl(html)).toBe(
-      'https://archive.today/2024/https://example.com',
+describe('parseTimemap', () => {
+  test('extracts last memento URL', () => {
+    const body = [
+      '<https://example.com>; rel="original",',
+      '<https://archive.is/timemap/https://example.com>; rel="self"; type="application/link-format",',
+      '<http://archive.md/20260101120000/https://example.com>; rel="first memento"; datetime="Thu, 01 Jan 2026 12:00:00 GMT",',
+      '<http://archive.md/20260226181830/https://example.com>; rel="last memento"; datetime="Thu, 26 Feb 2026 18:18:30 GMT"',
+    ].join('\n');
+    expect(mod.parseTimemap(body)).toBe(
+      'https://archive.md/20260226181830/https://example.com',
     );
   });
 
-  test('extracts URL from location.href assignment', () => {
-    const html = '<script>location.href = "https://archive.is/abc123";</script>';
-    expect(mod.extractSnapshotUrl(html)).toBe('https://archive.is/abc123');
-  });
-
-  test('extracts URL from location.replace()', () => {
-    const html = '<script>location.replace("https://archive.ph/2025/https://example.com");</script>';
-    expect(mod.extractSnapshotUrl(html)).toBe(
-      'https://archive.ph/2025/https://example.com',
+  test('extracts URL when single memento (first last memento)', () => {
+    const body = [
+      '<https://example.com>; rel="original",',
+      '<http://archive.md/20260226181830/https://example.com>; rel="first last memento"; datetime="Thu, 26 Feb 2026 18:18:30 GMT"',
+    ].join('\n');
+    expect(mod.parseTimemap(body)).toBe(
+      'https://archive.md/20260226181830/https://example.com',
     );
   });
 
-  test('returns null for search/submit page with no snapshot', () => {
-    const html =
-      '<html><body><form action="/submit"><input name="url"></form></body></html>';
-    expect(mod.extractSnapshotUrl(html)).toBeNull();
+  test('normalizes http to https', () => {
+    const body =
+      '<http://archive.md/20260226181830/https://example.com>; rel="last memento"; datetime="Thu, 26 Feb 2026 18:18:30 GMT"';
+    expect(mod.parseTimemap(body)).toBe(
+      'https://archive.md/20260226181830/https://example.com',
+    );
   });
 
-  test('returns null when redirect targets non-archive domain', () => {
-    const html = '<script>location.href = "https://evil.com/2024/https://example.com";</script>';
-    expect(mod.extractSnapshotUrl(html)).toBeNull();
+  test('returns null when no last memento entry', () => {
+    const body = [
+      '<https://example.com>; rel="original",',
+      '<https://archive.is/timemap/https://example.com>; rel="self"; type="application/link-format"',
+    ].join('\n');
+    expect(mod.parseTimemap(body)).toBeNull();
   });
 
-  test('returns null when redirect URL contains /newest/', () => {
-    const html =
-      '<meta http-equiv="refresh" content="0;url=https://archive.today/newest/https://example.com">';
-    expect(mod.extractSnapshotUrl(html)).toBeNull();
+  test('returns null for non-archive domain', () => {
+    const body =
+      '<http://evil.com/20260226181830/https://example.com>; rel="last memento"; datetime="Thu, 26 Feb 2026 18:18:30 GMT"';
+    expect(mod.parseTimemap(body)).toBeNull();
+  });
+
+  test('returns null for empty body', () => {
+    expect(mod.parseTimemap('')).toBeNull();
   });
 });
 
 describe('checkArchive', () => {
-  test('returns snapshot URL on valid redirect', async () => {
+  const timemapMultiple = [
+    '<https://example.com/article>; rel="original",',
+    '<https://archive.is/timemap/https://example.com/article>; rel="self"; type="application/link-format",',
+    '<http://archive.md/20250101000000/https://example.com/article>; rel="first memento"; datetime="Wed, 01 Jan 2025 00:00:00 GMT",',
+    '<http://archive.md/20260226181830/https://example.com/article>; rel="last memento"; datetime="Thu, 26 Feb 2026 18:18:30 GMT"',
+  ].join('\n');
+
+  const timemapSingle = [
+    '<https://example.com/article>; rel="original",',
+    '<http://archive.md/20260226181830/https://example.com/article>; rel="first last memento"; datetime="Thu, 26 Feb 2026 18:18:30 GMT"',
+  ].join('\n');
+
+  test('returns snapshot URL with multiple mementos', async () => {
     chrome.storage.local.get.mockResolvedValue({});
     fetch.mockResolvedValue({
       ok: true,
-      url: 'https://archive.today/2024/https://example.com/article',
-      text: vi.fn().mockResolvedValue(''),
+      text: vi.fn().mockResolvedValue(timemapMultiple),
     });
     const result = await mod.checkArchive('https://example.com/article');
-    expect(result).toBe('https://archive.today/2024/https://example.com/article');
+    expect(result).toBe('https://archive.md/20260226181830/https://example.com/article');
     expect(chrome.storage.local.set).toHaveBeenCalled();
   });
 
-  test('returns null when no snapshot (stays on /newest/)', async () => {
+  test('returns snapshot URL with single memento', async () => {
     chrome.storage.local.get.mockResolvedValue({});
     fetch.mockResolvedValue({
       ok: true,
-      url: 'https://archive.today/newest/https://example.com/article',
-      text: vi.fn().mockResolvedValue('<html><body>No results</body></html>'),
+      text: vi.fn().mockResolvedValue(timemapSingle),
+    });
+    const result = await mod.checkArchive('https://example.com/article');
+    expect(result).toBe('https://archive.md/20260226181830/https://example.com/article');
+  });
+
+  test('returns null on 404 (no snapshots)', async () => {
+    chrome.storage.local.get.mockResolvedValue({});
+    fetch.mockResolvedValue({
+      ok: false,
+      status: 404,
     });
     const result = await mod.checkArchive('https://example.com/article');
     expect(result).toBeNull();
@@ -145,17 +176,6 @@ describe('checkArchive', () => {
   test('returns null on fetch error', async () => {
     chrome.storage.local.get.mockResolvedValue({});
     fetch.mockRejectedValue(new Error('Network error'));
-    const result = await mod.checkArchive('https://example.com/article');
-    expect(result).toBeNull();
-  });
-
-  test('rejects non-archive domains in final URL', async () => {
-    chrome.storage.local.get.mockResolvedValue({});
-    fetch.mockResolvedValue({
-      ok: true,
-      url: 'https://evil.com/2024/https://example.com/article',
-      text: vi.fn().mockResolvedValue(''),
-    });
     const result = await mod.checkArchive('https://example.com/article');
     expect(result).toBeNull();
   });
@@ -170,44 +190,17 @@ describe('checkArchive', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  test('accepts all known archive domains', async () => {
-    for (const domain of ['archive.today', 'archive.is', 'archive.md', 'archive.ph']) {
-      vi.resetModules();
-      chrome.storage.local.get.mockResolvedValue({});
-      fetch.mockResolvedValue({
-        ok: true,
-        url: `https://${domain}/2024/https://example.com`,
-        text: vi.fn().mockResolvedValue(''),
-      });
-      const freshMod = await import('../background.js');
-      const result = await freshMod.checkArchive('https://example.com');
-      expect(result).toBe(`https://${domain}/2024/https://example.com`);
-    }
-  });
-
-  test('falls back to meta-refresh body parsing when URL check fails', async () => {
+  test('fetches timemap endpoint with correct URL', async () => {
     chrome.storage.local.get.mockResolvedValue({});
-    const html =
-      '<html><head><meta http-equiv="refresh" content="0;url=https://archive.today/2024/https://example.com/article"></head></html>';
     fetch.mockResolvedValue({
       ok: true,
-      url: 'https://archive.today/newest/https://example.com/article',
-      text: vi.fn().mockResolvedValue(html),
+      text: vi.fn().mockResolvedValue(timemapSingle),
     });
-    const result = await mod.checkArchive('https://example.com/article');
-    expect(result).toBe('https://archive.today/2024/https://example.com/article');
-  });
-
-  test('falls back to JS redirect body parsing when URL check fails', async () => {
-    chrome.storage.local.get.mockResolvedValue({});
-    const html = '<script>location.href = "https://archive.is/abc123";</script>';
-    fetch.mockResolvedValue({
-      ok: true,
-      url: 'https://archive.today/newest/https://example.com/article',
-      text: vi.fn().mockResolvedValue(html),
-    });
-    const result = await mod.checkArchive('https://example.com/article');
-    expect(result).toBe('https://archive.is/abc123');
+    await mod.checkArchive('https://example.com/article');
+    expect(fetch).toHaveBeenCalledWith(
+      'https://archive.is/timemap/https://example.com/article',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 });
 
@@ -238,8 +231,11 @@ describe('checkBatchCacheOnly', () => {
 describe('checkBatch', () => {
   test('uses cache for fresh entries and fetches uncached', async () => {
     const cachedKey = mod.cacheKey('https://cached.com');
-    // First call: batch get (checkBatch reads all keys)
-    // Second call: getCached inside checkArchive for uncached.com
+    const timemap = [
+      '<https://uncached.com>; rel="original",',
+      '<http://archive.md/20260226181830/https://uncached.com>; rel="first last memento"; datetime="Thu, 26 Feb 2026 18:18:30 GMT"',
+    ].join('\n');
+
     chrome.storage.local.get
       .mockResolvedValueOnce({
         [cachedKey]: { snapshotUrl: 'https://archive.today/c', timestamp: Date.now() },
@@ -248,14 +244,13 @@ describe('checkBatch', () => {
 
     fetch.mockResolvedValue({
       ok: true,
-      url: 'https://archive.today/2024/https://uncached.com',
-      text: vi.fn().mockResolvedValue(''),
+      text: vi.fn().mockResolvedValue(timemap),
     });
 
     const results = await mod.checkBatch(['https://cached.com', 'https://uncached.com']);
     expect(results['https://cached.com']).toBe('https://archive.today/c');
     expect(results['https://uncached.com']).toBe(
-      'https://archive.today/2024/https://uncached.com',
+      'https://archive.md/20260226181830/https://uncached.com',
     );
     // fetch should only be called for uncached URL
     expect(fetch).toHaveBeenCalledTimes(1);

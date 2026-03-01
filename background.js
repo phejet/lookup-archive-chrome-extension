@@ -1,5 +1,6 @@
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const NEWEST_BASE = 'https://archive.today/newest/';
+const TIMEMAP_BASE = 'https://archive.is/timemap/';
 const ARCHIVE_DOMAINS = ['archive.today', 'archive.is', 'archive.md', 'archive.ph'];
 const cacheKey = (url) => 'cache_' + url;
 
@@ -90,65 +91,43 @@ async function checkBatch(urls) {
   return results;
 }
 
-function extractSnapshotUrl(html) {
-  const patterns = [
-    // meta http-equiv="refresh" redirect
-    /<meta[^>]+http-equiv=["']?refresh["']?[^>]+content=["'][^"']*;\s*url=([^"'\s>]+)/i,
-    // JS location.href assignment
-    /location\.href\s*=\s*["']([^"']+)["']/,
-    // JS location.replace()
-    /location\.replace\s*\(\s*["']([^"']+)["']\s*\)/,
-    // JS window.location assignment
-    /window\.location\s*=\s*["']([^"']+)["']/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (match) {
-      const candidate = match[1];
-      if (candidate.includes('/newest/')) continue;
-      try {
-        const hostname = new URL(candidate).hostname;
-        if (ARCHIVE_DOMAINS.some((d) => hostname === d || hostname.endsWith('.' + d))) {
-          return candidate;
-        }
-      } catch {
-        continue;
-      }
+function parseTimemap(body) {
+  // Find the entry with rel="last memento" or rel="first last memento"
+  const lines = body.split('\n');
+  for (const line of lines) {
+    if (!/rel="[^"]*last memento[^"]*"/.test(line)) continue;
+    const urlMatch = line.match(/^<([^>]+)>/);
+    if (!urlMatch) continue;
+    const candidate = urlMatch[1];
+    try {
+      const parsed = new URL(candidate);
+      const hostname = parsed.hostname;
+      if (!ARCHIVE_DOMAINS.some((d) => hostname === d || hostname.endsWith('.' + d))) continue;
+      // Normalize to HTTPS
+      parsed.protocol = 'https:';
+      return parsed.href;
+    } catch {
+      continue;
     }
   }
   return null;
 }
 
-// Check if a URL has an archived snapshot by following the redirect and inspecting the final URL.
-// archive.today/newest/<url> redirects to a timestamped snapshot like archive.today/2024/https://...
-// If no snapshot exists, the final URL stays on archive.today/newest/ or shows a search/submit page.
+// Check if a URL has an archived snapshot using the Memento TimeMap API.
+// archive.is/timemap/<url> returns 200 with link-format data listing all mementos,
+// or 404 when no snapshots exist.
 async function checkArchive(url) {
   const cached = await getCached(url);
   if (cached !== undefined) return cached;
 
   let snapshotUrl = null;
   try {
-    const response = await fetch(NEWEST_BASE + url, {
-      redirect: 'follow',
-      headers: { Accept: 'text/html' },
+    const response = await fetch(TIMEMAP_BASE + url, {
       signal: AbortSignal.timeout(15000),
     });
-    const finalUrl = response.url;
-    // A successful snapshot URL contains a timestamp path segment like /2024... or /YYYY
-    // and does NOT end with /newest/
-    if (response.ok && finalUrl !== NEWEST_BASE + url && !finalUrl.includes('/newest/')) {
-      // Verify the response URL belongs to a known archive domain
-      const finalHostname = new URL(finalUrl).hostname;
-      if (ARCHIVE_DOMAINS.some((d) => finalHostname === d || finalHostname.endsWith('.' + d))) {
-        snapshotUrl = finalUrl;
-      }
-    }
-
-    // Fallback: parse response body for JS/meta-refresh redirects
-    if (!snapshotUrl && response.ok) {
+    if (response.ok) {
       const body = await response.text();
-      snapshotUrl = extractSnapshotUrl(body);
+      snapshotUrl = parseTimemap(body);
     }
   } catch (e) {
     console.error('Archive.today lookup failed for', url, e);
@@ -185,6 +164,6 @@ if (typeof module !== 'undefined' && module.exports) {
     checkArchive,
     checkBatch,
     checkBatchCacheOnly,
-    extractSnapshotUrl,
+    parseTimemap,
   };
 }
