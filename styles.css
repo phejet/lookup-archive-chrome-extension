@@ -1,0 +1,36 @@
+.archive-today-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+  padding: 1px;
+  color: #666;
+  text-decoration: none;
+  vertical-align: middle;
+  opacity: 0.6;
+  transition: opacity 0.15s, color 0.15s;
+  cursor: pointer;
+}
+
+.archive-today-indicator:hover {
+  opacity: 1;
+  color: #1a73e8;
+}
+
+.archive-today-icon-svg {
+  display: block;
+}
+
+#archive-today-status {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 2147483647;
+  background: #333;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  max-width: 400px;
+}
