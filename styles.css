@@ -36,7 +36,3 @@
   opacity: 0.85;
   transition: opacity 1s ease;
 }
-
-#archive-today-status.fading {
-  opacity: 0;
-}

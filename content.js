@@ -25,23 +25,22 @@ function showStatus(text) {
   const banner = getOrCreateBanner();
   banner.textContent = text;
   banner.style.display = 'block';
+  banner.style.opacity = '0.85';
 }
 
 function fadeAndHideStatus() {
   if (!statusBanner) return;
-  statusBanner.classList.add('fading');
+  statusBanner.style.opacity = '0';
   setTimeout(() => {
     if (statusBanner) {
       statusBanner.style.display = 'none';
-      statusBanner.classList.remove('fading');
     }
-  }, 1000); // matches CSS transition duration
+  }, 1000);
 }
 
 function hideStatus() {
   if (statusBanner) {
     statusBanner.style.display = 'none';
-    statusBanner.classList.remove('fading');
   }
 }
 
