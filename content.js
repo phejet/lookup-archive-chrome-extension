@@ -105,11 +105,15 @@ async function collectNewLinks() {
 }
 
 async function scanPage() {
-  if (scanInProgress) return;
+  if (scanInProgress) {
+    console.log('[Archive.today] Scan already in progress, skipping.');
+    return;
+  }
   scanInProgress = true;
 
   try {
     const entries = await collectNewLinks();
+    console.log(`[Archive.today] Found ${entries.length} new links to check (${checkedUrls.size} already checked).`);
     if (entries.length === 0) {
       scanInProgress = false;
       return;
@@ -167,12 +171,15 @@ function injectIndicator(link, snapshotUrl) {
 
 // Auto-scan: listen for scroll and re-scan when viewport changes significantly
 function onScroll() {
-  const delta = Math.abs(window.scrollY - lastScrollY);
-  // Only re-scan if scrolled at least half a viewport
-  if (delta < window.innerHeight * 0.5) return;
-
   clearTimeout(scrollTimer);
   scrollTimer = setTimeout(() => {
+    const delta = Math.abs(window.scrollY - lastScrollY);
+    console.log(`[Archive.today] Scroll settled. delta=${Math.round(delta)}px, threshold=${Math.round(window.innerHeight * 0.5)}px`);
+    if (delta < window.innerHeight * 0.5) {
+      console.log('[Archive.today] Scroll delta too small, skipping scan.');
+      return;
+    }
+    console.log('[Archive.today] Triggering re-scan from scroll.');
     lastScrollY = window.scrollY;
     scanPage();
   }, 500); // debounce 500ms after scroll settles
@@ -181,8 +188,10 @@ function onScroll() {
 // Initialize auto-scan if enabled
 async function initAutoScan() {
   const data = await chrome.storage.sync.get({ autoScan: false });
+  console.log('[Archive.today] Auto-scan setting:', data.autoScan);
   if (data.autoScan) {
     lastScrollY = window.scrollY;
+    console.log('[Archive.today] Auto-scan enabled, running initial scan and attaching scroll listener.');
     scanPage();
     window.addEventListener('scroll', onScroll, { passive: true });
   }
