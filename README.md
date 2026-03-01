@@ -22,6 +22,12 @@ The extension uses archive.today's `/newest/<url>` endpoint, which redirects to 
 4. Click **Load unpacked** and select the project folder
 5. The extension icon appears in your toolbar
 
+## Usage
+
+Right-click any link on a page and select **"Look up on Archive.today"** — if an archived snapshot exists, it opens in a new tab.
+
+For bulk checking, configure URL prefixes first (see below), then right-click the page background and select **"Scan page for archives"**. Links with available snapshots get a small archive icon you can click.
+
 ## Configure
 
 1. Click the extension icon in the toolbar
