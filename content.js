@@ -2,29 +2,17 @@ const ARCHIVE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1
   <path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h11A1.5 1.5 0 0 1 15 2.5v1A1.5 1.5 0 0 1 13.5 5H13v8.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 3 13.5V5h-.5A1.5 1.5 0 0 1 1 3.5v-1zM2.5 2a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-11zM4 5v8.5a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V5H4zm3 2h2a.5.5 0 0 1 0 1H7a.5.5 0 0 1 0-1z"/>
 </svg>`;
 
-let statusBanner = null;
+// Track which canonical URLs we've already checked (to avoid re-checking on scroll)
+const checkedUrls = new Set();
+let scanInProgress = false;
+let scrollTimer = null;
+let lastScrollY = 0;
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'scan-page') {
     scanPage();
   }
 });
-
-function showStatus(text) {
-  if (!statusBanner) {
-    statusBanner = document.createElement('div');
-    statusBanner.id = 'archive-today-status';
-    document.body.appendChild(statusBanner);
-  }
-  statusBanner.textContent = text;
-  statusBanner.style.display = 'block';
-}
-
-function hideStatus() {
-  if (statusBanner) {
-    statusBanner.style.display = 'none';
-  }
-}
 
 // Returns canonical URL path (strips query params, fragments, trailing slash)
 function canonicalPath(href) {
@@ -74,28 +62,26 @@ function isArticleUrl(href) {
 // Check if an element is in or near the current viewport
 function isInViewport(el) {
   const rect = el.getBoundingClientRect();
-  // Zero-size elements are hidden
   if (rect.width === 0 && rect.height === 0) return false;
 
   const viewHeight = window.innerHeight;
-  // Include a 50% buffer below the viewport to catch just-off-screen content
   const buffer = viewHeight * 0.5;
   return rect.top < viewHeight + buffer && rect.bottom > -buffer;
 }
 
-async function scanPage() {
-  // Remove any existing indicators
-  document.querySelectorAll('.archive-today-indicator').forEach(el => el.remove());
+function getMatchingPrefixes() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get({ prefixes: [] }, (data) => {
+      const prefixes = data.prefixes.length > 0 ? data.prefixes : [location.hostname];
+      resolve(prefixes);
+    });
+  });
+}
 
-  let prefixes = await getPrefixes();
-  // Default to the current site's hostname if no prefixes are configured
-  if (prefixes.length === 0) {
-    prefixes = [location.hostname];
-  }
-
+// Collect viewport links that haven't been checked yet
+async function collectNewLinks() {
+  const prefixes = await getMatchingPrefixes();
   const allLinks = document.querySelectorAll('a[href]');
-  const seenPaths = new Set();
-  const linksToScan = []; // { url, elements[] }
   const urlToElements = new Map();
 
   for (const link of allLinks) {
@@ -105,57 +91,64 @@ async function scanPage() {
     if (!isArticleUrl(href)) continue;
 
     const canon = canonicalPath(href);
+    if (checkedUrls.has(canon)) {
+      // Already checked — but still inject indicator if this element doesn't have one
+      continue;
+    }
     if (!urlToElements.has(canon)) {
       urlToElements.set(canon, { url: href, elements: [] });
     }
     urlToElements.get(canon).elements.push(link);
   }
 
-  const uniqueEntries = [...urlToElements.values()];
+  return [...urlToElements.values()];
+}
 
-  if (uniqueEntries.length === 0) {
-    showStatus('No article links found on this page.');
-    setTimeout(hideStatus, 5000);
-    return;
-  }
+async function scanPage() {
+  if (scanInProgress) return;
+  scanInProgress = true;
 
-  showStatus(`Scanning ${uniqueEntries.length} article links for archives... (0/${uniqueEntries.length})`);
-
-  let checked = 0;
-  let found = 0;
-
-  for (const entry of uniqueEntries) {
-    try {
-      const snapshotUrl = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ action: 'check-single', url: entry.url }, (response) => {
-          if (chrome.runtime.lastError) {
-            reject(chrome.runtime.lastError);
-          } else {
-            resolve(response);
-          }
-        });
-      });
-
-      if (snapshotUrl) {
-        found++;
-        for (const link of entry.elements) {
-          injectIndicator(link, snapshotUrl);
-        }
-      }
-    } catch (e) {
-      console.error('Archive.today scan error for', entry.url, e);
+  try {
+    const entries = await collectNewLinks();
+    if (entries.length === 0) {
+      scanInProgress = false;
+      return;
     }
 
-    checked++;
-    showStatus(`Scanning ${uniqueEntries.length} article links... (${checked}/${uniqueEntries.length}, ${found} found)`);
-  }
+    for (const entry of entries) {
+      const canon = canonicalPath(entry.url);
+      try {
+        const snapshotUrl = await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage({ action: 'check-single', url: entry.url }, (response) => {
+            if (chrome.runtime.lastError) {
+              reject(chrome.runtime.lastError);
+            } else {
+              resolve(response);
+            }
+          });
+        });
 
-  showStatus(`Scan complete: ${found} archived link${found !== 1 ? 's' : ''} found out of ${uniqueEntries.length} checked.`);
-  setTimeout(hideStatus, 5000);
+        checkedUrls.add(canon);
+
+        if (snapshotUrl) {
+          // Inject for the elements we collected, plus any other matching links on the page
+          const allLinks = document.querySelectorAll('a[href]');
+          for (const link of allLinks) {
+            if (canonicalPath(link.href) === canon) {
+              injectIndicator(link, snapshotUrl);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Archive.today scan error for', entry.url, e);
+      }
+    }
+  } finally {
+    scanInProgress = false;
+  }
 }
 
 function injectIndicator(link, snapshotUrl) {
-  // Don't double-inject
   if (link.nextElementSibling?.classList.contains('archive-today-indicator')) return;
 
   const indicator = document.createElement('a');
@@ -172,10 +165,40 @@ function injectIndicator(link, snapshotUrl) {
   link.insertAdjacentElement('afterend', indicator);
 }
 
-function getPrefixes() {
-  return new Promise((resolve) => {
-    chrome.storage.sync.get({ prefixes: [] }, (data) => {
-      resolve(data.prefixes);
-    });
-  });
+// Auto-scan: listen for scroll and re-scan when viewport changes significantly
+function onScroll() {
+  const delta = Math.abs(window.scrollY - lastScrollY);
+  // Only re-scan if scrolled at least half a viewport
+  if (delta < window.innerHeight * 0.5) return;
+
+  clearTimeout(scrollTimer);
+  scrollTimer = setTimeout(() => {
+    lastScrollY = window.scrollY;
+    scanPage();
+  }, 500); // debounce 500ms after scroll settles
 }
+
+// Initialize auto-scan if enabled
+async function initAutoScan() {
+  const data = await chrome.storage.sync.get({ autoScan: false });
+  if (data.autoScan) {
+    lastScrollY = window.scrollY;
+    scanPage();
+    window.addEventListener('scroll', onScroll, { passive: true });
+  }
+}
+
+// Listen for setting changes (e.g. user toggles auto-scan in popup)
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'sync' && changes.autoScan) {
+    if (changes.autoScan.newValue) {
+      lastScrollY = window.scrollY;
+      scanPage();
+      window.addEventListener('scroll', onScroll, { passive: true });
+    } else {
+      window.removeEventListener('scroll', onScroll);
+    }
+  }
+});
+
+initAutoScan();
