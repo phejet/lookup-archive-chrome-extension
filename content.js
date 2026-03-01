@@ -96,8 +96,9 @@ function isInViewport(el) {
 function getMatchingPrefixes() {
   return new Promise((resolve) => {
     chrome.storage.sync.get({ prefixes: [] }, (data) => {
-      const prefixes = data.prefixes.length > 0 ? data.prefixes : [location.hostname];
-      resolve(prefixes);
+      // Always include current site's hostname, plus any configured prefixes
+      const prefixes = [location.hostname, ...data.prefixes];
+      resolve([...new Set(prefixes)]);
     });
   });
 }
