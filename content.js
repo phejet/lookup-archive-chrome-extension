@@ -169,8 +169,41 @@ function injectIndicator(link, snapshotUrl) {
   link.insertAdjacentElement('afterend', indicator);
 }
 
-// Get current scroll position (works with both window and document-level scrolling)
+// Find the actual scrolling element on the page
+let scrollTarget = null;
+
+function findScrollTarget() {
+  // Check if window/document scrolls
+  if (document.documentElement.scrollHeight > window.innerHeight) {
+    const style = getComputedStyle(document.documentElement);
+    const bodyStyle = getComputedStyle(document.body);
+    // If html/body overflow is not hidden/clip, window scrolls
+    if (style.overflow !== 'hidden' && style.overflowY !== 'hidden' &&
+        bodyStyle.overflow !== 'hidden' && bodyStyle.overflowY !== 'hidden') {
+      console.log('[Archive.today] Scroll target: window');
+      return null; // null = use window
+    }
+  }
+
+  // Find a scrollable container — look for elements with overflow scroll/auto that are large
+  const candidates = document.querySelectorAll('div, main, section, article');
+  for (const el of candidates) {
+    const style = getComputedStyle(el);
+    const overflowY = style.overflowY;
+    if ((overflowY === 'auto' || overflowY === 'scroll') &&
+        el.scrollHeight > el.clientHeight &&
+        el.clientHeight > window.innerHeight * 0.5) {
+      console.log('[Archive.today] Scroll target: container element', el.tagName, el.className.slice(0, 50));
+      return el;
+    }
+  }
+
+  console.log('[Archive.today] Scroll target: window (fallback)');
+  return null;
+}
+
 function getScrollY() {
+  if (scrollTarget) return scrollTarget.scrollTop;
   return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
 }
 
@@ -209,15 +242,23 @@ function requestScan() {
 }
 
 function attachScrollListeners() {
-  // Listen on multiple targets to handle all scrolling scenarios
-  window.addEventListener('scroll', onScroll, { passive: true });
-  document.addEventListener('scroll', onScroll, { passive: true });
-  console.log('[Archive.today] Scroll listeners attached.');
+  scrollTarget = findScrollTarget();
+  const targets = scrollTarget
+    ? [scrollTarget]
+    : [window, document];
+  for (const t of targets) {
+    t.addEventListener('scroll', onScroll, { passive: true });
+  }
+  console.log('[Archive.today] Scroll listeners attached to', targets.length, 'target(s).');
 }
 
 function detachScrollListeners() {
-  window.removeEventListener('scroll', onScroll);
-  document.removeEventListener('scroll', onScroll);
+  const targets = scrollTarget
+    ? [scrollTarget]
+    : [window, document];
+  for (const t of targets) {
+    t.removeEventListener('scroll', onScroll);
+  }
 }
 
 // Initialize auto-scan if enabled
