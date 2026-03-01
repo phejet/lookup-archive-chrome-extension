@@ -2,12 +2,23 @@ const ARCHIVE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1
   <path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h11A1.5 1.5 0 0 1 15 2.5v1A1.5 1.5 0 0 1 13.5 5H13v8.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 3 13.5V5h-.5A1.5 1.5 0 0 1 1 3.5v-1zM2.5 2a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-11zM4 5v8.5a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V5H4zm3 2h2a.5.5 0 0 1 0 1H7a.5.5 0 0 1 0-1z"/>
 </svg>`;
 
+// Pre-parse the SVG into a reusable DocumentFragment
+const iconTemplate = (() => {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(ARCHIVE_ICON_SVG, 'image/svg+xml');
+  const fragment = document.createDocumentFragment();
+  fragment.appendChild(doc.documentElement);
+  return fragment;
+})();
+
 const checkedUrls = new Set();
 let scanInProgress = false;
 let isAutoScan = false;
 let showOnDemandProgress = false;
 // Track whether current scan was triggered manually (on-demand)
 let currentScanIsManual = false;
+// Track fade timeout so we can cancel overlapping fades
+let fadeTimeoutId = null;
 
 // --- Status banner (bottom-right, only for on-demand scans) ---
 let statusBanner = null;
@@ -22,20 +33,34 @@ function getOrCreateBanner() {
 
 function showStatus(text) {
   if (!showOnDemandProgress || !currentScanIsManual) return;
+  // Cancel any pending fade animation
+  if (fadeTimeoutId) {
+    fadeTimeoutId.cancel();
+    fadeTimeoutId = null;
+  }
   const banner = getOrCreateBanner();
+  // Clear any lingering animations (fill: 'forwards' keeps opacity: 0)
+  banner.getAnimations().forEach(a => a.cancel());
   banner.textContent = text;
   banner.style.display = 'block';
-  banner.style.opacity = '0.85';
 }
 
-function fadeAndHideStatus() {
+function scheduleFade(delayMs) {
+  if (fadeTimeoutId) {
+    clearTimeout(fadeTimeoutId);
+  }
+  // Use the Web Animations API delay instead of setTimeout,
+  // since setTimeout can be throttled/killed in content scripts
   if (!statusBanner) return;
   const anim = statusBanner.animate(
     [{ opacity: 0.85 }, { opacity: 0 }],
-    { duration: 1000, fill: 'forwards' }
+    { duration: 1000, delay: delayMs, fill: 'forwards' }
   );
+  // Store a cancel handle instead of a timeout ID
+  fadeTimeoutId = anim;
   anim.onfinish = () => {
     if (statusBanner) statusBanner.style.display = 'none';
+    if (fadeTimeoutId === anim) fadeTimeoutId = null;
   };
 }
 
@@ -105,21 +130,15 @@ function collectNewLinks() {
   const allLinks = document.querySelectorAll('a[href]');
   const urlToElements = new Map();
 
-  let totalMatched = 0;
-  let skippedViewport = 0;
-  let skippedArticle = 0;
-  let skippedChecked = 0;
-
   for (const link of allLinks) {
     const href = link.href;
     if (!prefixes.some(prefix => href.includes(prefix))) continue;
-    totalMatched++;
 
-    if (!isInViewport(link)) { skippedViewport++; continue; }
-    if (!isArticleUrl(href)) { skippedArticle++; continue; }
+    if (!isInViewport(link)) continue;
+    if (!isArticleUrl(href)) continue;
 
     const canon = canonicalPath(href);
-    if (checkedUrls.has(canon)) { skippedChecked++; continue; }
+    if (checkedUrls.has(canon)) continue;
 
     if (!urlToElements.has(canon)) {
       urlToElements.set(canon, { url: href, elements: [] });
@@ -127,24 +146,37 @@ function collectNewLinks() {
     urlToElements.get(canon).elements.push(link);
   }
 
-  console.log(`[Archive.today] Link collection: ${totalMatched} prefix-matched, ${skippedViewport} outside viewport, ${skippedArticle} non-article, ${skippedChecked} already checked, ${urlToElements.size} to scan`);
-
   return [...urlToElements.values()];
+}
+
+// --- Send message with timeout ---
+function sendMessageWithTimeout(msg, timeoutMs = 20000) {
+  return Promise.race([
+    new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(msg, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+        } else {
+          resolve(response);
+        }
+      });
+    }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Message timeout')), timeoutMs)
+    )
+  ]);
 }
 
 // --- Scanning ---
 async function scanPage() {
-  if (scanInProgress) {
-    console.log('[Archive.today] Scan already in progress, skipping.');
-    return;
-  }
+  if (scanInProgress) return;
   scanInProgress = true;
 
   try {
     const entries = collectNewLinks();
     if (entries.length === 0) {
       showStatus('No new article links to scan.');
-      setTimeout(fadeAndHideStatus, 3000);
+      scheduleFade(3000);
       scanInProgress = false;
       return;
     }
@@ -152,28 +184,22 @@ async function scanPage() {
     let checked = 0;
     let found = 0;
     let notFound = 0;
+    let errors = 0;
 
     showStatus(`Scanning ${entries.length} links... (0/${entries.length})`);
 
     for (const entry of entries) {
       const canon = canonicalPath(entry.url);
       try {
-        const snapshotUrl = await new Promise((resolve, reject) => {
-          chrome.runtime.sendMessage({ action: 'check-single', url: entry.url }, (response) => {
-            if (chrome.runtime.lastError) {
-              reject(chrome.runtime.lastError);
-            } else {
-              resolve(response);
-            }
-          });
-        });
+        const snapshotUrl = await sendMessageWithTimeout({ action: 'check-single', url: entry.url });
 
         checkedUrls.add(canon);
 
         if (snapshotUrl) {
           found++;
-          const allLinks = document.querySelectorAll('a[href]');
-          for (const link of allLinks) {
+          // Use elements collected earlier, plus re-query for any added since collection
+          const freshLinks = document.querySelectorAll('a[href]');
+          for (const link of freshLinks) {
             if (canonicalPath(link.href) === canon) {
               injectIndicator(link, snapshotUrl);
             }
@@ -183,17 +209,19 @@ async function scanPage() {
         }
       } catch (e) {
         console.error('Archive.today scan error for', entry.url, e);
-        notFound++;
+        errors++;
       }
 
       checked++;
-      showStatus(`Scanning... ${checked}/${entries.length} | ${found} archived, ${notFound} not found`);
+      let statusParts = [`${checked}/${entries.length}`, `${found} archived`, `${notFound} not found`];
+      if (errors > 0) statusParts.push(`${errors} errors`);
+      showStatus(`Scanning... ${statusParts.join(' | ')}`);
     }
 
-    const summary = `Scan complete: ${checked} scanned, ${found} archived, ${notFound} not found`;
-    console.log(`[Archive.today] ${summary}`);
-    showStatus(summary);
-    setTimeout(fadeAndHideStatus, 5000);
+    let summaryParts = [`${checked} scanned`, `${found} archived`, `${notFound} not found`];
+    if (errors > 0) summaryParts.push(`${errors} errors`);
+    showStatus(`Scan complete: ${summaryParts.join(', ')}`);
+    scheduleFade(5000);
   } finally {
     scanInProgress = false;
     currentScanIsManual = false;
@@ -201,7 +229,11 @@ async function scanPage() {
 }
 
 function injectIndicator(link, snapshotUrl) {
-  if (link.nextElementSibling?.classList.contains('archive-today-indicator')) return;
+  // Check parent for existing indicator with matching href
+  if (link.parentElement) {
+    const existing = link.parentElement.querySelector(`.archive-today-indicator[href="${CSS.escape(snapshotUrl)}"]`);
+    if (existing) return;
+  }
 
   const indicator = document.createElement('a');
   indicator.href = snapshotUrl;
@@ -209,7 +241,7 @@ function injectIndicator(link, snapshotUrl) {
   indicator.rel = 'noopener noreferrer';
   indicator.className = 'archive-today-indicator';
   indicator.title = 'Open archived snapshot';
-  indicator.innerHTML = ARCHIVE_ICON_SVG;
+  indicator.appendChild(iconTemplate.cloneNode(true));
   indicator.addEventListener('click', (e) => {
     e.stopPropagation();
   });
@@ -217,36 +249,43 @@ function injectIndicator(link, snapshotUrl) {
   link.insertAdjacentElement('afterend', indicator);
 }
 
-// --- Scroll detection via polling ---
-let pollInterval = null;
-let lastDocTop = 0;
+// --- Scroll detection via scroll event ---
+let scrollListening = false;
+let lastScrollY = 0;
+let scrollTimeout = null;
 
-function startScrollDetection() {
-  lastDocTop = document.documentElement.getBoundingClientRect().top;
-  console.log(`[Archive.today] Scroll detection started. Initial docTop: ${Math.round(lastDocTop)}px`);
-
-  pollInterval = setInterval(() => {
-    const docTop = document.documentElement.getBoundingClientRect().top;
-    const delta = Math.abs(docTop - lastDocTop);
+function onScroll() {
+  // Debounce: wait until scrolling stops for 500ms, then check delta
+  if (scrollTimeout) clearTimeout(scrollTimeout);
+  scrollTimeout = setTimeout(() => {
+    const currentY = window.scrollY;
+    const delta = Math.abs(currentY - lastScrollY);
     const threshold = window.innerHeight * 0.5;
-
-    if (delta > 10) {
-      console.log(`[Archive.today] Poll: docTop=${Math.round(docTop)}, last=${Math.round(lastDocTop)}, delta=${Math.round(delta)}, threshold=${Math.round(threshold)}`);
-    }
-
     if (delta >= threshold) {
-      console.log(`[Archive.today] Viewport changed enough. Triggering re-scan.`);
-      lastDocTop = docTop;
+      lastScrollY = currentY;
       currentScanIsManual = false;
       scanPage();
     }
-  }, 1500);
+  }, 500);
+}
+
+function startScrollDetection() {
+  if (scrollListening) return;
+  lastScrollY = window.scrollY;
+  window.addEventListener('scroll', onScroll, { passive: true });
+  document.addEventListener('scroll', onScroll, { passive: true, capture: true });
+  scrollListening = true;
 }
 
 function stopScrollDetection() {
-  if (pollInterval) {
-    clearInterval(pollInterval);
-    pollInterval = null;
+  if (scrollListening) {
+    window.removeEventListener('scroll', onScroll);
+    document.removeEventListener('scroll', onScroll, { capture: true });
+    scrollListening = false;
+    if (scrollTimeout) {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = null;
+    }
   }
 }
 
@@ -255,10 +294,7 @@ async function init() {
   const data = await chrome.storage.sync.get({ autoScan: false, showOnDemandProgress: false });
   isAutoScan = data.autoScan;
   showOnDemandProgress = data.showOnDemandProgress;
-  console.log('[Archive.today] Settings:', { autoScan: data.autoScan, showOnDemandProgress: data.showOnDemandProgress });
-  console.log('[Archive.today] Page hostname:', location.hostname);
   if (isAutoScan) {
-    console.log('[Archive.today] Auto-scan enabled, running initial scan.');
     currentScanIsManual = false;
     scanPage();
     startScrollDetection();

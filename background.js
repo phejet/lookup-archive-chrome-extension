@@ -1,5 +1,7 @@
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const NEWEST_BASE = 'https://archive.today/newest/';
+const ARCHIVE_DOMAINS = ['archive.today', 'archive.is', 'archive.md', 'archive.ph'];
+const cacheKey = (url) => 'cache_' + url;
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
@@ -28,12 +30,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'check-urls') {
-    checkUrlsBatch(message.urls).then(sendResponse);
-    return true;
-  }
   if (message.action === 'check-single') {
-    checkArchive(message.url).then(sendResponse);
+    checkArchive(message.url).then(sendResponse).catch(() => sendResponse(null));
     return true;
   }
 });
@@ -49,13 +47,18 @@ async function checkArchive(url) {
   try {
     const response = await fetch(NEWEST_BASE + url, {
       redirect: 'follow',
-      headers: { 'Accept': 'text/html' }
+      headers: { 'Accept': 'text/html' },
+      signal: AbortSignal.timeout(15000)
     });
     const finalUrl = response.url;
     // A successful snapshot URL contains a timestamp path segment like /2024... or /YYYY
     // and does NOT end with /newest/
     if (response.ok && finalUrl !== NEWEST_BASE + url && !finalUrl.includes('/newest/')) {
-      snapshotUrl = finalUrl;
+      // Verify the response URL belongs to a known archive domain
+      const finalHostname = new URL(finalUrl).hostname;
+      if (ARCHIVE_DOMAINS.some(d => finalHostname === d || finalHostname.endsWith('.' + d))) {
+        snapshotUrl = finalUrl;
+      }
     }
   } catch (e) {
     console.error('Archive.today lookup failed for', url, e);
@@ -65,25 +68,8 @@ async function checkArchive(url) {
   return snapshotUrl;
 }
 
-async function checkUrlsBatch(urls) {
-  const results = {};
-  for (const url of urls) {
-    const wasCached = await isCached(url);
-    results[url] = await checkArchive(url);
-    // Throttle: 1 request per second (skip delay for cached results)
-    if (!wasCached) {
-      await sleep(1000);
-    }
-  }
-  return results;
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 async function getCached(url) {
-  const key = 'cache_' + url;
+  const key = cacheKey(url);
   const data = await chrome.storage.local.get(key);
   const entry = data[key];
   if (!entry) return undefined;
@@ -94,16 +80,8 @@ async function getCached(url) {
   return entry.snapshotUrl;
 }
 
-async function isCached(url) {
-  const key = 'cache_' + url;
-  const data = await chrome.storage.local.get(key);
-  const entry = data[key];
-  if (!entry) return false;
-  return Date.now() - entry.timestamp <= CACHE_TTL_MS;
-}
-
 async function setCache(url, snapshotUrl) {
-  const key = 'cache_' + url;
+  const key = cacheKey(url);
   await chrome.storage.local.set({
     [key]: { snapshotUrl, timestamp: Date.now() }
   });
