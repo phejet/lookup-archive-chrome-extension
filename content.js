@@ -113,6 +113,10 @@ async function collectNewLinks() {
   let skippedArticle = 0;
   let skippedChecked = 0;
 
+  // Debug: sample what link hrefs look like and what we're matching against
+  const sampleHrefs = [...allLinks].slice(0, 5).map(l => l.href);
+  console.log(`[Archive.today] Prefixes: ${JSON.stringify(prefixes)}, total links: ${allLinks.length}, sample hrefs:`, sampleHrefs);
+
   for (const link of allLinks) {
     const href = link.href;
     if (!prefixes.some(prefix => href.includes(prefix))) continue;
