@@ -12,6 +12,8 @@ chrome.runtime.onInstalled.addListener(() => {
     title: 'Scan page for archives',
     contexts: ['page']
   });
+  // Clean up stale prefixes from older versions
+  chrome.storage.sync.remove('prefixes');
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {

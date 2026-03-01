@@ -94,18 +94,12 @@ function isInViewport(el) {
 }
 
 function getMatchingPrefixes() {
-  return new Promise((resolve) => {
-    chrome.storage.sync.get({ prefixes: [] }, (data) => {
-      // Always include current site's hostname, plus any configured prefixes
-      const prefixes = [location.hostname, ...data.prefixes];
-      resolve([...new Set(prefixes)]);
-    });
-  });
+  return [location.hostname];
 }
 
 // --- Link collection ---
-async function collectNewLinks() {
-  const prefixes = await getMatchingPrefixes();
+function collectNewLinks() {
+  const prefixes = getMatchingPrefixes();
   const allLinks = document.querySelectorAll('a[href]');
   const urlToElements = new Map();
 
