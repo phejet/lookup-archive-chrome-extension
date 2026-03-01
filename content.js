@@ -87,11 +87,10 @@ async function scanPage() {
   // Remove any existing indicators
   document.querySelectorAll('.archive-today-indicator').forEach(el => el.remove());
 
-  const prefixes = await getPrefixes();
+  let prefixes = await getPrefixes();
+  // Default to the current site's hostname if no prefixes are configured
   if (prefixes.length === 0) {
-    showStatus('No URL prefixes configured. Click the extension icon to add some.');
-    setTimeout(hideStatus, 5000);
-    return;
+    prefixes = [location.hostname];
   }
 
   const allLinks = document.querySelectorAll('a[href]');
@@ -115,7 +114,7 @@ async function scanPage() {
   const uniqueEntries = [...urlToElements.values()];
 
   if (uniqueEntries.length === 0) {
-    showStatus('No article links matching your prefixes found on this page.');
+    showStatus('No article links found on this page.');
     setTimeout(hideStatus, 5000);
     return;
   }

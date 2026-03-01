@@ -26,11 +26,12 @@ The extension uses archive.today's `/newest/<url>` endpoint, which redirects to 
 
 Right-click any link on a page and select **"Look up on Archive.today"** — if an archived snapshot exists, it opens in a new tab.
 
-For bulk checking, configure URL prefixes first (see below), then right-click the page background and select **"Scan page for archives"**. Links with available snapshots get a small archive icon you can click.
+For bulk checking, right-click the page background and select **"Scan page for archives"**. It automatically scans links matching the current site's domain. Links with available snapshots get a small archive icon you can click.
 
-## Configure
+## Configure (optional)
+
+By default, "Scan page for archives" matches links from the current site's domain. To scan for links from *other* domains on a page (e.g. scanning a Google News page for `afr.com` links):
 
 1. Click the extension icon in the toolbar
-2. Add URL prefixes for sites you want to scan (e.g. `afr.com`)
-3. Navigate to a page with links to those sites
-4. Right-click → **"Scan page for archives"** to find archived snapshots
+2. Add URL prefixes for the domains you want (e.g. `afr.com`)
+3. Right-click → **"Scan page for archives"**
