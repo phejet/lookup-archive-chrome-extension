@@ -5,8 +5,6 @@ const ARCHIVE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1
 // Track which canonical URLs we've already checked (to avoid re-checking on scroll)
 const checkedUrls = new Set();
 let scanInProgress = false;
-let scrollTimer = null;
-let lastScrollY = 0;
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'scan-page') {
@@ -169,95 +167,53 @@ function injectIndicator(link, snapshotUrl) {
   link.insertAdjacentElement('afterend', indicator);
 }
 
-// Find the actual scrolling element on the page
-let scrollTarget = null;
+// Use a sentinel element with IntersectionObserver to detect viewport changes.
+// This works regardless of how the page implements scrolling.
+let sentinel = null;
+let observer = null;
+let pollInterval = null;
 
-function findScrollTarget() {
-  // Check if window/document scrolls
-  if (document.documentElement.scrollHeight > window.innerHeight) {
-    const style = getComputedStyle(document.documentElement);
-    const bodyStyle = getComputedStyle(document.body);
-    // If html/body overflow is not hidden/clip, window scrolls
-    if (style.overflow !== 'hidden' && style.overflowY !== 'hidden' &&
-        bodyStyle.overflow !== 'hidden' && bodyStyle.overflowY !== 'hidden') {
-      console.log('[Archive.today] Scroll target: window');
-      return null; // null = use window
-    }
-  }
+function startScrollDetection() {
+  // Place a sentinel element at the bottom of the current viewport
+  updateSentinel();
 
-  // Find a scrollable container — look for elements with overflow scroll/auto that are large
-  const candidates = document.querySelectorAll('div, main, section, article');
-  for (const el of candidates) {
-    const style = getComputedStyle(el);
-    const overflowY = style.overflowY;
-    if ((overflowY === 'auto' || overflowY === 'scroll') &&
-        el.scrollHeight > el.clientHeight &&
-        el.clientHeight > window.innerHeight * 0.5) {
-      console.log('[Archive.today] Scroll target: container element', el.tagName, el.className.slice(0, 50));
-      return el;
-    }
-  }
-
-  console.log('[Archive.today] Scroll target: window (fallback)');
-  return null;
-}
-
-function getScrollY() {
-  if (scrollTarget) return scrollTarget.scrollTop;
-  return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
-}
-
-// Auto-scan: listen for scroll and re-scan when viewport changes significantly
-function onScroll() {
-  clearTimeout(scrollTimer);
-  scrollTimer = setTimeout(() => {
-    const currentY = getScrollY();
-    const delta = Math.abs(currentY - lastScrollY);
-    const threshold = window.innerHeight * 0.5;
-    console.log(`[Archive.today] Scroll settled. scrollY=${Math.round(currentY)}, lastScrollY=${Math.round(lastScrollY)}, delta=${Math.round(delta)}px, threshold=${Math.round(threshold)}px`);
-    if (delta < threshold) {
-      console.log('[Archive.today] Scroll delta too small, skipping scan.');
-      return;
-    }
-    console.log('[Archive.today] Triggering re-scan from scroll.');
-    lastScrollY = currentY;
-    scanPage();
-  }, 500);
-}
-
-let pendingScan = false;
-
-// Queue a scan — if one is in progress, run another when it finishes
-function requestScan() {
-  if (scanInProgress) {
-    pendingScan = true;
-    return;
-  }
-  scanPage().then(() => {
-    if (pendingScan) {
-      pendingScan = false;
+  // Poll: check every 1s if viewport has moved significantly
+  // This is a simple, reliable fallback that works on all sites
+  pollInterval = setInterval(() => {
+    // Use a sentinel element's position to detect if viewport changed
+    if (!sentinel) return;
+    const rect = sentinel.getBoundingClientRect();
+    // If the sentinel has scrolled well out of view, the viewport has changed
+    if (rect.top < -window.innerHeight * 0.3 || rect.top > window.innerHeight * 1.3) {
+      console.log(`[Archive.today] Viewport change detected (sentinel offset: ${Math.round(rect.top)}px). Triggering re-scan.`);
+      updateSentinel();
       scanPage();
     }
-  });
+  }, 1500);
+
+  console.log('[Archive.today] Scroll detection started (polling).');
 }
 
-function attachScrollListeners() {
-  scrollTarget = findScrollTarget();
-  const targets = scrollTarget
-    ? [scrollTarget]
-    : [window, document];
-  for (const t of targets) {
-    t.addEventListener('scroll', onScroll, { passive: true });
+function updateSentinel() {
+  if (!sentinel) {
+    sentinel = document.createElement('div');
+    sentinel.id = 'archive-today-sentinel';
+    sentinel.style.cssText = 'position:absolute;width:1px;height:1px;pointer-events:none;opacity:0;z-index:-1;';
+    document.body.appendChild(sentinel);
   }
-  console.log('[Archive.today] Scroll listeners attached to', targets.length, 'target(s).');
+  // Position at the middle of the current viewport
+  const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+  sentinel.style.top = (scrollY + window.innerHeight * 0.5) + 'px';
 }
 
-function detachScrollListeners() {
-  const targets = scrollTarget
-    ? [scrollTarget]
-    : [window, document];
-  for (const t of targets) {
-    t.removeEventListener('scroll', onScroll);
+function stopScrollDetection() {
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+  }
+  if (sentinel) {
+    sentinel.remove();
+    sentinel = null;
   }
 }
 
@@ -266,10 +222,9 @@ async function initAutoScan() {
   const data = await chrome.storage.sync.get({ autoScan: false });
   console.log('[Archive.today] Auto-scan setting:', data.autoScan);
   if (data.autoScan) {
-    lastScrollY = getScrollY();
-    console.log('[Archive.today] Auto-scan enabled, initial scrollY:', Math.round(lastScrollY));
+    console.log('[Archive.today] Auto-scan enabled, running initial scan.');
     scanPage();
-    attachScrollListeners();
+    startScrollDetection();
   }
 }
 
@@ -277,11 +232,10 @@ async function initAutoScan() {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'sync' && changes.autoScan) {
     if (changes.autoScan.newValue) {
-      lastScrollY = getScrollY();
       scanPage();
-      attachScrollListeners();
+      startScrollDetection();
     } else {
-      detachScrollListeners();
+      stopScrollDetection();
     }
   }
 });
