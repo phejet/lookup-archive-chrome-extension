@@ -2,47 +2,41 @@ const ARCHIVE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1
   <path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h11A1.5 1.5 0 0 1 15 2.5v1A1.5 1.5 0 0 1 13.5 5H13v8.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 3 13.5V5h-.5A1.5 1.5 0 0 1 1 3.5v-1zM2.5 2a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-11zM4 5v8.5a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V5H4zm3 2h2a.5.5 0 0 1 0 1H7a.5.5 0 0 1 0-1z"/>
 </svg>`;
 
-// Track which canonical URLs we've already checked (to avoid re-checking on scroll)
 const checkedUrls = new Set();
 let scanInProgress = false;
-let showProgress = false;
+let isAutoScan = false;
+let showOnDemandProgress = false;
+// Track whether current scan was triggered manually (on-demand)
+let currentScanIsManual = false;
 
-// --- Status badge (discreet, bottom-right) ---
-let statusBadge = null;
-let statusExpanded = false;
+// --- Status banner (bottom-right, only for on-demand scans) ---
+let statusBanner = null;
 
-function getOrCreateBadge() {
-  if (statusBadge) return statusBadge;
-  statusBadge = document.createElement('div');
-  statusBadge.id = 'archive-today-badge';
-  statusBadge.addEventListener('click', () => {
-    statusExpanded = !statusExpanded;
-    statusBadge.classList.toggle('expanded', statusExpanded);
-  });
-  document.body.appendChild(statusBadge);
-  return statusBadge;
+function getOrCreateBanner() {
+  if (statusBanner) return statusBanner;
+  statusBanner = document.createElement('div');
+  statusBanner.id = 'archive-today-status';
+  document.body.appendChild(statusBanner);
+  return statusBanner;
 }
 
-function updateBadge(text, count) {
-  if (!showProgress) return;
-  const badge = getOrCreateBadge();
-  badge.setAttribute('data-count', count || '');
-  badge.setAttribute('data-text', text);
-  badge.innerHTML = statusExpanded
-    ? `<span class="archive-badge-text">${text}</span>`
-    : ARCHIVE_ICON_SVG;
-  badge.style.display = 'flex';
+function showStatus(text) {
+  if (!showOnDemandProgress || !currentScanIsManual) return;
+  const banner = getOrCreateBanner();
+  banner.textContent = text;
+  banner.style.display = 'block';
 }
 
-function hideBadge() {
-  if (statusBadge) {
-    statusBadge.style.display = 'none';
+function hideStatus() {
+  if (statusBanner) {
+    statusBanner.style.display = 'none';
   }
 }
 
 // --- Message listener ---
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'scan-page') {
+    currentScanIsManual = true;
     scanPage();
   }
 });
@@ -93,13 +87,9 @@ function isInViewport(el) {
   return rect.top < viewHeight + buffer && rect.bottom > -buffer;
 }
 
-function getMatchingPrefixes() {
-  return [location.hostname];
-}
-
 // --- Link collection ---
 function collectNewLinks() {
-  const prefixes = getMatchingPrefixes();
+  const prefixes = [location.hostname];
   const allLinks = document.querySelectorAll('a[href]');
   const urlToElements = new Map();
 
@@ -107,10 +97,6 @@ function collectNewLinks() {
   let skippedViewport = 0;
   let skippedArticle = 0;
   let skippedChecked = 0;
-
-  // Debug: sample what link hrefs look like and what we're matching against
-  const sampleHrefs = [...allLinks].slice(0, 5).map(l => l.href);
-  console.log(`[Archive.today] Prefixes: ${JSON.stringify(prefixes)}, total links: ${allLinks.length}, sample hrefs:`, sampleHrefs);
 
   for (const link of allLinks) {
     const href = link.href;
@@ -143,16 +129,19 @@ async function scanPage() {
   scanInProgress = true;
 
   try {
-    const entries = await collectNewLinks();
+    const entries = collectNewLinks();
     if (entries.length === 0) {
+      showStatus('No new article links to scan.');
+      setTimeout(hideStatus, 3000);
       scanInProgress = false;
       return;
     }
 
     let checked = 0;
     let found = 0;
+    let notFound = 0;
 
-    updateBadge(`Scanning... 0/${entries.length}`, '...');
+    showStatus(`Scanning ${entries.length} links... (0/${entries.length})`);
 
     for (const entry of entries) {
       const canon = canonicalPath(entry.url);
@@ -177,20 +166,25 @@ async function scanPage() {
               injectIndicator(link, snapshotUrl);
             }
           }
+        } else {
+          notFound++;
         }
       } catch (e) {
         console.error('Archive.today scan error for', entry.url, e);
+        notFound++;
       }
 
       checked++;
-      updateBadge(`Scanning... ${checked}/${entries.length} (${found} found)`, found || '...');
+      showStatus(`Scanning... ${checked}/${entries.length} | ${found} archived, ${notFound} not found`);
     }
 
-    console.log(`[Archive.today] Scan complete: ${found}/${entries.length} archived.`);
-    updateBadge(`${found} archived`, found);
-    setTimeout(hideBadge, 5000);
+    const summary = `Scan complete: ${checked} scanned, ${found} archived, ${notFound} not found`;
+    console.log(`[Archive.today] ${summary}`);
+    showStatus(summary);
+    setTimeout(hideStatus, 8000);
   } finally {
     scanInProgress = false;
+    currentScanIsManual = false;
   }
 }
 
@@ -231,6 +225,7 @@ function startScrollDetection() {
     if (delta >= threshold) {
       console.log(`[Archive.today] Viewport changed enough. Triggering re-scan.`);
       lastDocTop = docTop;
+      currentScanIsManual = false;
       scanPage();
     }
   }, 1500);
@@ -244,13 +239,15 @@ function stopScrollDetection() {
 }
 
 // --- Init ---
-async function initAutoScan() {
-  const data = await chrome.storage.sync.get({ autoScan: false, showProgress: false });
-  showProgress = data.showProgress;
-  console.log('[Archive.today] Settings:', { autoScan: data.autoScan, showProgress: data.showProgress });
+async function init() {
+  const data = await chrome.storage.sync.get({ autoScan: false, showOnDemandProgress: false });
+  isAutoScan = data.autoScan;
+  showOnDemandProgress = data.showOnDemandProgress;
+  console.log('[Archive.today] Settings:', { autoScan: data.autoScan, showOnDemandProgress: data.showOnDemandProgress });
   console.log('[Archive.today] Page hostname:', location.hostname);
-  if (data.autoScan) {
+  if (isAutoScan) {
     console.log('[Archive.today] Auto-scan enabled, running initial scan.');
+    currentScanIsManual = false;
     scanPage();
     startScrollDetection();
   }
@@ -259,18 +256,20 @@ async function initAutoScan() {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'sync') {
     if (changes.autoScan) {
-      if (changes.autoScan.newValue) {
+      isAutoScan = changes.autoScan.newValue;
+      if (isAutoScan) {
+        currentScanIsManual = false;
         scanPage();
         startScrollDetection();
       } else {
         stopScrollDetection();
       }
     }
-    if (changes.showProgress) {
-      showProgress = changes.showProgress.newValue;
-      if (!showProgress) hideBadge();
+    if (changes.showOnDemandProgress) {
+      showOnDemandProgress = changes.showOnDemandProgress.newValue;
+      if (!showOnDemandProgress) hideStatus();
     }
   }
 });
 
-initAutoScan();
+init();
