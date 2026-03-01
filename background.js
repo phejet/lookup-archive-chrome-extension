@@ -7,12 +7,12 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: 'lookup-archive',
     title: 'Look up on Archive.today',
-    contexts: ['link']
+    contexts: ['link'],
   });
   chrome.contextMenus.create({
     id: 'scan-page',
     title: 'Scan page for archives',
-    contexts: ['page']
+    contexts: ['page'],
   });
   // Clean up stale prefixes from older versions
   chrome.storage.sync.remove('prefixes');
@@ -31,15 +31,21 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'check-single') {
-    checkArchive(message.url).then(sendResponse).catch(() => sendResponse(null));
+    checkArchive(message.url)
+      .then(sendResponse)
+      .catch(() => sendResponse(null));
     return true;
   }
   if (message.action === 'check-batch') {
-    checkBatch(message.urls).then(sendResponse).catch(() => sendResponse({}));
+    checkBatch(message.urls)
+      .then(sendResponse)
+      .catch(() => sendResponse({}));
     return true;
   }
   if (message.action === 'check-batch-cache-only') {
-    checkBatchCacheOnly(message.urls).then(sendResponse).catch(() => sendResponse({}));
+    checkBatchCacheOnly(message.urls)
+      .then(sendResponse)
+      .catch(() => sendResponse({}));
     return true;
   }
 });
@@ -95,8 +101,8 @@ async function checkArchive(url) {
   try {
     const response = await fetch(NEWEST_BASE + url, {
       redirect: 'follow',
-      headers: { 'Accept': 'text/html' },
-      signal: AbortSignal.timeout(15000)
+      headers: { Accept: 'text/html' },
+      signal: AbortSignal.timeout(15000),
     });
     const finalUrl = response.url;
     // A successful snapshot URL contains a timestamp path segment like /2024... or /YYYY
@@ -104,7 +110,7 @@ async function checkArchive(url) {
     if (response.ok && finalUrl !== NEWEST_BASE + url && !finalUrl.includes('/newest/')) {
       // Verify the response URL belongs to a known archive domain
       const finalHostname = new URL(finalUrl).hostname;
-      if (ARCHIVE_DOMAINS.some(d => finalHostname === d || finalHostname.endsWith('.' + d))) {
+      if (ARCHIVE_DOMAINS.some((d) => finalHostname === d || finalHostname.endsWith('.' + d))) {
         snapshotUrl = finalUrl;
       }
     }
@@ -131,6 +137,6 @@ async function getCached(url) {
 async function setCache(url, snapshotUrl) {
   const key = cacheKey(url);
   await chrome.storage.local.set({
-    [key]: { snapshotUrl, timestamp: Date.now() }
+    [key]: { snapshotUrl, timestamp: Date.now() },
   });
 }

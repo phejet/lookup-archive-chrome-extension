@@ -51,18 +51,21 @@ function addSite(raw) {
 }
 
 function removeSite(domain) {
-  autoScanSites = autoScanSites.filter(s => s !== domain);
+  autoScanSites = autoScanSites.filter((s) => s !== domain);
   chrome.storage.sync.set({ autoScanSites });
   renderSiteList();
 }
 
-chrome.storage.sync.get({ autoScan: false, autoScanSites: [], showOnDemandProgress: false, debugLogging: false }, (data) => {
-  autoScanToggle.checked = data.autoScan;
-  showProgressToggle.checked = data.showOnDemandProgress;
-  debugLoggingToggle.checked = data.debugLogging;
-  autoScanSites = data.autoScanSites;
-  renderSiteList();
-});
+chrome.storage.sync.get(
+  { autoScan: false, autoScanSites: [], showOnDemandProgress: false, debugLogging: false },
+  (data) => {
+    autoScanToggle.checked = data.autoScan;
+    showProgressToggle.checked = data.showOnDemandProgress;
+    debugLoggingToggle.checked = data.debugLogging;
+    autoScanSites = data.autoScanSites;
+    renderSiteList();
+  },
+);
 
 autoScanToggle.addEventListener('change', () => {
   chrome.storage.sync.set({ autoScan: autoScanToggle.checked });
@@ -94,7 +97,9 @@ addCurrentSiteBtn.addEventListener('click', () => {
       try {
         const hostname = new URL(tabs[0].url).hostname;
         addSite(hostname);
-      } catch {}
+      } catch {
+        // ignore invalid URLs
+      }
     }
   });
 });

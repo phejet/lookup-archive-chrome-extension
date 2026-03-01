@@ -21,7 +21,7 @@ let currentScanIsManual = false;
 function isCurrentSiteAllowed() {
   if (autoScanSites.length === 0) return false;
   const hostname = location.hostname;
-  return autoScanSites.some(site => hostname === site || hostname.endsWith('.' + site));
+  return autoScanSites.some((site) => hostname === site || hostname.endsWith('.' + site));
 }
 
 function debugLog(...args) {
@@ -29,7 +29,7 @@ function debugLog(...args) {
 }
 
 // --- Priority queue + worker pool state ---
-const queue = new Map();       // canon -> { url, canon, elements[], state: 'pending'|'in-flight'|'done' }
+const queue = new Map(); // canon -> { url, canon, elements[], state: 'pending'|'in-flight'|'done' }
 let activeWorkers = 0;
 const MAX_WORKERS = 5;
 let stats = { queued: 0, checked: 0, found: 0, notFound: 0, errors: 0 };
@@ -58,7 +58,7 @@ function showStatus(text) {
   }
   const banner = getOrCreateBanner();
   // Clear any lingering animations (fill: 'forwards' keeps opacity: 0)
-  banner.getAnimations().forEach(a => a.cancel());
+  banner.getAnimations().forEach((a) => a.cancel());
   banner.textContent = text;
   banner.style.display = 'block';
 }
@@ -70,10 +70,11 @@ function scheduleFade(delayMs) {
   // Use the Web Animations API delay instead of setTimeout,
   // since setTimeout can be throttled/killed in content scripts
   if (!statusBanner) return;
-  const anim = statusBanner.animate(
-    [{ opacity: 0.85 }, { opacity: 0 }],
-    { duration: 1000, delay: delayMs, fill: 'forwards' }
-  );
+  const anim = statusBanner.animate([{ opacity: 0.85 }, { opacity: 0 }], {
+    duration: 1000,
+    delay: delayMs,
+    fill: 'forwards',
+  });
   // Store a cancel handle instead of a timeout ID
   fadeTimeoutId = anim;
   anim.onfinish = () => {
@@ -89,7 +90,7 @@ function hideStatus() {
 }
 
 // --- Message listener ---
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
   if (message.action === 'scan-page') {
     currentScanIsManual = true;
     // Reset stats for fresh banner on manual scan
@@ -113,7 +114,7 @@ function isArticleUrl(href) {
   try {
     const u = new URL(href);
     const path = u.pathname;
-    const segments = path.split('/').filter(s => s.length > 0);
+    const segments = path.split('/').filter((s) => s.length > 0);
     if (segments.length < 2) return false;
 
     const articlePatterns = [
@@ -125,7 +126,7 @@ function isArticleUrl(href) {
       /\/opinion\//,
       /\/p\//,
     ];
-    if (articlePatterns.some(p => p.test(path))) return true;
+    if (articlePatterns.some((p) => p.test(path))) return true;
 
     const lastSegment = segments[segments.length - 1];
     if (lastSegment.includes('-') && lastSegment.length >= 20) return true;
@@ -153,7 +154,7 @@ function collectNewLinks() {
 
   for (const link of allLinks) {
     const href = link.href;
-    if (!prefixes.some(prefix => href.includes(prefix))) continue;
+    if (!prefixes.some((prefix) => href.includes(prefix))) continue;
 
     if (!isInViewport(link)) continue;
     if (!isArticleUrl(href)) continue;
@@ -182,9 +183,7 @@ function sendMessageWithTimeout(msg, timeoutMs = 20000) {
         }
       });
     }),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Message timeout')), timeoutMs)
-    )
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Message timeout')), timeoutMs)),
   ]);
 }
 
@@ -220,7 +219,7 @@ function enqueueLinks(entries) {
         url: entry.url,
         canon,
         elements: [...entry.elements],
-        state: 'pending'
+        state: 'pending',
       });
       added++;
       stats.queued++;
@@ -289,7 +288,9 @@ function injectIndicatorsForCanon(canon, snapshotUrl) {
 function injectIndicator(link, snapshotUrl) {
   // Check parent for existing indicator with matching href
   if (link.parentElement) {
-    const existing = link.parentElement.querySelector(`.archive-today-indicator[href="${CSS.escape(snapshotUrl)}"]`);
+    const existing = link.parentElement.querySelector(
+      `.archive-today-indicator[href="${CSS.escape(snapshotUrl)}"]`,
+    );
     if (existing) return;
   }
 
@@ -313,7 +314,7 @@ function updateBanner() {
   const parts = [
     `${stats.checked}/${stats.queued}`,
     `${stats.found} archived`,
-    `${stats.notFound} not found`
+    `${stats.notFound} not found`,
   ];
   if (stats.errors > 0) parts.push(`${stats.errors} errors`);
   if (inFlight > 0) parts.push(`${inFlight} checking`);
@@ -325,7 +326,7 @@ function showScanComplete() {
   const parts = [
     `${stats.checked} checked`,
     `${stats.found} archived`,
-    `${stats.notFound} not found`
+    `${stats.notFound} not found`,
   ];
   if (stats.errors > 0) parts.push(`${stats.errors} errors`);
   parts.push(`${elapsed}ms`);
@@ -347,7 +348,14 @@ async function worker() {
       try {
         const t0 = performance.now();
         const snapshotUrl = await sendMessageWithTimeout({ action: 'check-single', url: item.url });
-        debugLog('check-single took ' + Math.round(performance.now() - t0) + 'ms for ' + item.url + ' → ' + (snapshotUrl ? 'found' : 'not found'));
+        debugLog(
+          'check-single took ' +
+            Math.round(performance.now() - t0) +
+            'ms for ' +
+            item.url +
+            ' → ' +
+            (snapshotUrl ? 'found' : 'not found'),
+        );
 
         checkedUrls.add(item.canon);
         item.state = 'done';
@@ -379,7 +387,9 @@ async function worker() {
 function ensureWorkers() {
   const pending = countPending();
   const toSpawn = Math.min(MAX_WORKERS - activeWorkers, pending);
-  debugLog('ensureWorkers: pending=' + pending + ' active=' + activeWorkers + ' spawning=' + toSpawn);
+  debugLog(
+    'ensureWorkers: pending=' + pending + ' active=' + activeWorkers + ' spawning=' + toSpawn,
+  );
   for (let i = 0; i < toSpawn; i++) {
     worker(); // fire-and-forget
   }
@@ -393,14 +403,19 @@ async function resolveCachedItems() {
   }
   if (pendingItems.length === 0) return;
 
-  const urls = pendingItems.map(item => item.url);
+  const urls = pendingItems.map((item) => item.url);
   try {
     const t0 = performance.now();
-    const cached = await sendMessageWithTimeout(
-      { action: 'check-batch-cache-only', urls },
-      10000
+    const cached = await sendMessageWithTimeout({ action: 'check-batch-cache-only', urls }, 10000);
+    debugLog(
+      'Batch cache lookup took ' +
+        Math.round(performance.now() - t0) +
+        'ms, resolved ' +
+        Object.keys(cached).length +
+        '/' +
+        urls.length +
+        ' from cache',
     );
-    debugLog('Batch cache lookup took ' + Math.round(performance.now() - t0) + 'ms, resolved ' + Object.keys(cached).length + '/' + urls.length + ' from cache');
 
     for (const item of pendingItems) {
       if (item.url in cached) {
@@ -437,7 +452,15 @@ async function scanPage() {
   if (scanStartTime === 0) scanStartTime = performance.now();
 
   const added = enqueueLinks(entries);
-  debugLog('Enqueued ' + added + ' new links (' + entries.length + ' collected, ' + queue.size + ' total in queue)');
+  debugLog(
+    'Enqueued ' +
+      added +
+      ' new links (' +
+      entries.length +
+      ' collected, ' +
+      queue.size +
+      ' total in queue)',
+  );
 
   if (added === 0) return;
 
@@ -459,7 +482,14 @@ function onScroll() {
   const delta = Math.abs(currentY - lastScanScrollY);
   const threshold = window.innerHeight * 0.25;
   if (delta >= threshold) {
-    debugLog('Scroll threshold met, triggering scan. delta=' + Math.round(delta) + ' threshold=' + Math.round(threshold) + ' checkedTotal=' + checkedUrls.size);
+    debugLog(
+      'Scroll threshold met, triggering scan. delta=' +
+        Math.round(delta) +
+        ' threshold=' +
+        Math.round(threshold) +
+        ' checkedTotal=' +
+        checkedUrls.size,
+    );
     lastScanScrollY = currentY;
     currentScanIsManual = false;
     scanPage();
@@ -484,7 +514,12 @@ function stopScrollDetection() {
 
 // --- Init ---
 async function init() {
-  const data = await chrome.storage.sync.get({ autoScan: false, autoScanSites: [], showOnDemandProgress: false, debugLogging: false });
+  const data = await chrome.storage.sync.get({
+    autoScan: false,
+    autoScanSites: [],
+    showOnDemandProgress: false,
+    debugLogging: false,
+  });
   isAutoScan = data.autoScan;
   autoScanSites = data.autoScanSites;
   showOnDemandProgress = data.showOnDemandProgress;
