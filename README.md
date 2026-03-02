@@ -5,6 +5,8 @@
 
 A Chrome extension for quickly looking up archived snapshots of web pages on [archive.today](https://archive.today). Handy for researchers, journalists, and anyone who wants to check if a page has been preserved in a web archive.
 
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/fumbledpelican)
+
 ## Features
 
 - **Right-click any link → "Look up on Archive.today"** — opens the latest archived snapshot in a new tab
@@ -40,9 +42,3 @@ To have pages scanned automatically without right-clicking:
 2. Toggle **Auto-scan** on
 3. Add domains to the allowlist (e.g. `nytimes.com`) — type a domain and click **Add**, or click **Add current site**
 4. When you visit a page on an allowed domain, visible article links are scanned on load and as you scroll
-
-## Support
-
-If you find this extension useful, consider buying me a coffee:
-
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/fumbledpelican)
