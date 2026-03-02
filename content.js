@@ -276,6 +276,39 @@ function cleanupDoneItems() {
   }
 }
 
+// --- Snapshot date helpers ---
+function parseSnapshotDate(snapshotUrl) {
+  const match = snapshotUrl.match(/\/(\d{14})\//);
+  if (!match) return null;
+  const s = match[1];
+  const year = +s.slice(0, 4);
+  const month = +s.slice(4, 6) - 1;
+  const day = +s.slice(6, 8);
+  const hour = +s.slice(8, 10);
+  const min = +s.slice(10, 12);
+  const sec = +s.slice(12, 14);
+  const date = new Date(Date.UTC(year, month, day, hour, min, sec));
+  if (isNaN(date.getTime())) return null;
+  return date;
+}
+
+function formatRelativeTime(date) {
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) return 'just now';
+  const seconds = Math.floor(diffMs / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return days === 1 ? '1 day ago' : `${days} days ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return months === 1 ? '1 month ago' : `${months} months ago`;
+  const years = Math.floor(days / 365);
+  return years === 1 ? '1 year ago' : `${years} years ago`;
+}
+
 // --- Inject indicators for a canonical URL ---
 function injectIndicatorsForCanon(canon, snapshotUrl) {
   const freshLinks = document.querySelectorAll('a[href]:not(.archive-today-indicator)');
@@ -297,7 +330,10 @@ function injectIndicator(link, snapshotUrl) {
   indicator.target = '_blank';
   indicator.rel = 'noopener noreferrer';
   indicator.className = 'archive-today-indicator';
-  indicator.title = 'Open archived snapshot';
+  const snapshotDate = parseSnapshotDate(snapshotUrl);
+  indicator.title = snapshotDate
+    ? `Archived ${formatRelativeTime(snapshotDate)}`
+    : 'Open archived snapshot';
   indicator.appendChild(iconTemplate.cloneNode(true));
   indicator.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -573,6 +609,8 @@ if (typeof module !== 'undefined' && module.exports) {
     isArticleUrl,
     isInViewport,
     injectIndicator,
+    parseSnapshotDate,
+    formatRelativeTime,
     sendMessageWithTimeout,
   };
 }

@@ -134,21 +134,88 @@ describe('isInViewport', () => {
   });
 });
 
+describe('parseSnapshotDate', () => {
+  test('parses 14-digit timestamp from archive URL', () => {
+    const date = mod.parseSnapshotDate('https://archive.md/20260226181830/https://example.com');
+    expect(date).toBeInstanceOf(Date);
+    expect(date.toISOString()).toBe('2026-02-26T18:18:30.000Z');
+  });
+
+  test('returns null for URL without timestamp', () => {
+    expect(mod.parseSnapshotDate('https://archive.today/snap')).toBeNull();
+  });
+
+  test('returns null for URL with short numeric path', () => {
+    expect(mod.parseSnapshotDate('https://archive.md/12345/')).toBeNull();
+  });
+});
+
+describe('formatRelativeTime', () => {
+  test('returns "just now" for very recent dates', () => {
+    const now = new Date();
+    expect(mod.formatRelativeTime(now)).toBe('just now');
+  });
+
+  test('returns minutes ago', () => {
+    const date = new Date(Date.now() - 5 * 60 * 1000);
+    expect(mod.formatRelativeTime(date)).toBe('5 minutes ago');
+  });
+
+  test('returns "1 hour ago" for singular', () => {
+    const date = new Date(Date.now() - 61 * 60 * 1000);
+    expect(mod.formatRelativeTime(date)).toBe('1 hour ago');
+  });
+
+  test('returns days ago', () => {
+    const date = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    expect(mod.formatRelativeTime(date)).toBe('3 days ago');
+  });
+
+  test('returns months ago', () => {
+    const date = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+    expect(mod.formatRelativeTime(date)).toBe('2 months ago');
+  });
+
+  test('returns years ago', () => {
+    const date = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
+    expect(mod.formatRelativeTime(date)).toBe('1 year ago');
+  });
+
+  test('returns "just now" for future dates', () => {
+    const date = new Date(Date.now() + 60000);
+    expect(mod.formatRelativeTime(date)).toBe('just now');
+  });
+});
+
 describe('injectIndicator', () => {
-  test('appends indicator inside the link', () => {
+  test('appends indicator with dynamic tooltip for timestamped URL', () => {
     const container = document.createElement('div');
     const link = document.createElement('a');
     link.href = 'https://example.com/article';
     link.textContent = 'Article headline';
     container.appendChild(link);
 
-    mod.injectIndicator(link, 'https://archive.today/snap');
+    mod.injectIndicator(link, 'https://archive.md/20260226181830/https://example.com/article');
 
     const indicator = link.querySelector('.archive-today-indicator');
     expect(indicator).not.toBeNull();
-    expect(indicator.href).toBe('https://archive.today/snap');
+    expect(indicator.href).toContain('archive.md/20260226181830');
     expect(indicator.target).toBe('_blank');
     expect(indicator.rel).toBe('noopener noreferrer');
+    expect(indicator.title).toMatch(/^Archived /);
+    expect(indicator.title).not.toBe('Open archived snapshot');
+  });
+
+  test('falls back to static tooltip for URL without timestamp', () => {
+    const container = document.createElement('div');
+    const link = document.createElement('a');
+    link.href = 'https://example.com/article';
+    container.appendChild(link);
+
+    mod.injectIndicator(link, 'https://archive.today/snap');
+
+    const indicator = link.querySelector('.archive-today-indicator');
+    expect(indicator.title).toBe('Open archived snapshot');
   });
 
   test('does not duplicate indicator', () => {
