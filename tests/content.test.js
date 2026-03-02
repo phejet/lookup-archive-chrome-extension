@@ -135,45 +135,33 @@ describe('isInViewport', () => {
 });
 
 describe('injectIndicator', () => {
-  test('inserts indicator element after the link', () => {
+  test('appends indicator inside the link', () => {
     const container = document.createElement('div');
     const link = document.createElement('a');
     link.href = 'https://example.com/article';
+    link.textContent = 'Article headline';
     container.appendChild(link);
 
     mod.injectIndicator(link, 'https://archive.today/snap');
 
-    const indicator = container.querySelector('.archive-today-indicator');
+    const indicator = link.querySelector('.archive-today-indicator');
     expect(indicator).not.toBeNull();
     expect(indicator.href).toBe('https://archive.today/snap');
     expect(indicator.target).toBe('_blank');
     expect(indicator.rel).toBe('noopener noreferrer');
   });
 
-  test('does not duplicate indicator with same href', () => {
+  test('does not duplicate indicator', () => {
     const container = document.createElement('div');
     const link = document.createElement('a');
     link.href = 'https://example.com/article';
     container.appendChild(link);
 
     mod.injectIndicator(link, 'https://archive.today/snap');
-    mod.injectIndicator(link, 'https://archive.today/snap');
-
-    const indicators = container.querySelectorAll('.archive-today-indicator');
-    expect(indicators.length).toBe(1);
-  });
-
-  test('allows different snapshot URLs for same link', () => {
-    const container = document.createElement('div');
-    const link = document.createElement('a');
-    link.href = 'https://example.com/article';
-    container.appendChild(link);
-
-    mod.injectIndicator(link, 'https://archive.today/snap1');
     mod.injectIndicator(link, 'https://archive.today/snap2');
 
-    const indicators = container.querySelectorAll('.archive-today-indicator');
-    expect(indicators.length).toBe(2);
+    const indicators = link.querySelectorAll('.archive-today-indicator');
+    expect(indicators.length).toBe(1);
   });
 });
 

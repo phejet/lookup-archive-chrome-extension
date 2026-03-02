@@ -288,13 +288,9 @@ function injectIndicatorsForCanon(canon, snapshotUrl) {
 }
 
 function injectIndicator(link, snapshotUrl) {
-  // Check parent for existing indicator with matching href
-  if (link.parentElement) {
-    const existing = link.parentElement.querySelector(
-      `.archive-today-indicator[href="${CSS.escape(snapshotUrl)}"]`,
-    );
-    if (existing) return;
-  }
+  // Check for existing indicator inside the link
+  const existing = link.querySelector('.archive-today-indicator');
+  if (existing) return;
 
   const indicator = document.createElement('a');
   indicator.href = snapshotUrl;
@@ -305,9 +301,11 @@ function injectIndicator(link, snapshotUrl) {
   indicator.appendChild(iconTemplate.cloneNode(true));
   indicator.addEventListener('click', (e) => {
     e.stopPropagation();
+    e.preventDefault();
+    window.open(snapshotUrl, '_blank', 'noopener,noreferrer');
   });
 
-  link.insertAdjacentElement('afterend', indicator);
+  link.appendChild(indicator);
 }
 
 // --- Banner updates ---
