@@ -10,6 +10,7 @@ A Chrome extension for quickly looking up archived snapshots of web pages on [ar
 - **Right-click any link → "Look up on Archive.today"** — opens the latest archived snapshot in a new tab
 - **Right-click page → "Scan page for archives"** — scans visible article links and adds a small archive icon next to those with available snapshots. Click the icon to open the snapshot.
 - **Auto-scan** — automatically scans pages on configured sites as they load and as you scroll. Add domains to the allowlist in the extension popup to enable this.
+- **Snapshot age tooltips** — hover over an archive icon to see how old the snapshot is (e.g., "Archived 3 days ago")
 - **Smart filtering** — automatically matches the current site's domain, deduplicates links, skips non-article URLs, and only checks links visible on screen
 - **24-hour cache** — avoids redundant requests to archive.today
 
@@ -29,7 +30,7 @@ The extension uses archive.today's `/newest/<url>` endpoint, which redirects to 
 
 Right-click any link on a page and select **"Look up on Archive.today"** — if an archived snapshot exists, it opens in a new tab.
 
-For bulk checking, right-click the page background and select **"Scan page for archives"**. It automatically scans links matching the current site's domain. Links with available snapshots get a small archive icon you can click.
+For bulk checking, right-click the page background and select **"Scan page for archives"**. It automatically scans links matching the current site's domain. Links with available snapshots get a small archive icon you can click. Hover over the icon to see how old the snapshot is.
 
 ### Auto-scan
 
