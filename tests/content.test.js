@@ -25,21 +25,15 @@ describe('canonicalPath', () => {
   });
 
   test('strips query string', () => {
-    expect(mod.canonicalPath('https://example.com/path?foo=bar')).toBe(
-      'https://example.com/path',
-    );
+    expect(mod.canonicalPath('https://example.com/path?foo=bar')).toBe('https://example.com/path');
   });
 
   test('strips hash', () => {
-    expect(mod.canonicalPath('https://example.com/path#section')).toBe(
-      'https://example.com/path',
-    );
+    expect(mod.canonicalPath('https://example.com/path#section')).toBe('https://example.com/path');
   });
 
   test('strips query and hash together', () => {
-    expect(mod.canonicalPath('https://example.com/path?a=1#top')).toBe(
-      'https://example.com/path',
-    );
+    expect(mod.canonicalPath('https://example.com/path?a=1#top')).toBe('https://example.com/path');
   });
 
   test('returns href as-is for invalid URL', () => {
@@ -81,9 +75,7 @@ describe('isArticleUrl', () => {
   });
 
   test('matches long slug with hyphens', () => {
-    expect(mod.isArticleUrl('https://site.com/section/this-is-a-long-article-headline')).toBe(
-      true,
-    );
+    expect(mod.isArticleUrl('https://site.com/section/this-is-a-long-article-headline')).toBe(true);
   });
 
   test('matches paths with 3+ segments', () => {

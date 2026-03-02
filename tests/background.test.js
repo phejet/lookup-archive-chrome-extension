@@ -87,9 +87,7 @@ describe('parseTimemap', () => {
       '<http://archive.md/20260101120000/https://example.com>; rel="first memento"; datetime="Thu, 01 Jan 2026 12:00:00 GMT",',
       '<http://archive.md/20260226181830/https://example.com>; rel="last memento"; datetime="Thu, 26 Feb 2026 18:18:30 GMT"',
     ].join('\n');
-    expect(mod.parseTimemap(body)).toBe(
-      'https://archive.md/20260226181830/https://example.com',
-    );
+    expect(mod.parseTimemap(body)).toBe('https://archive.md/20260226181830/https://example.com');
   });
 
   test('extracts URL when single memento (first last memento)', () => {
@@ -97,17 +95,13 @@ describe('parseTimemap', () => {
       '<https://example.com>; rel="original",',
       '<http://archive.md/20260226181830/https://example.com>; rel="first last memento"; datetime="Thu, 26 Feb 2026 18:18:30 GMT"',
     ].join('\n');
-    expect(mod.parseTimemap(body)).toBe(
-      'https://archive.md/20260226181830/https://example.com',
-    );
+    expect(mod.parseTimemap(body)).toBe('https://archive.md/20260226181830/https://example.com');
   });
 
   test('normalizes http to https', () => {
     const body =
       '<http://archive.md/20260226181830/https://example.com>; rel="last memento"; datetime="Thu, 26 Feb 2026 18:18:30 GMT"';
-    expect(mod.parseTimemap(body)).toBe(
-      'https://archive.md/20260226181830/https://example.com',
-    );
+    expect(mod.parseTimemap(body)).toBe('https://archive.md/20260226181830/https://example.com');
   });
 
   test('returns null when no last memento entry', () => {

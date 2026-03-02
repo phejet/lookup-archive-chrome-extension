@@ -20,11 +20,11 @@ When you use Archive Lookup, it:
 
 The extension requests the following Chrome permissions:
 
-| Permission | Why it is needed |
-|---|---|
-| `contextMenus` | To add the "Look up on archive" and "Scan page for archives" right-click menu items. |
-| `storage` | To save your settings (auto-scan toggle, site list, UI preferences) and to cache archive lookup results locally so the same URL is not looked up more than once every 24 hours. |
-| `activeTab` | To read the current tab's hostname when you click "Add current site" in the popup, and to send scan messages to the content script. |
+| Permission                               | Why it is needed                                                                                                                                                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contextMenus`                           | To add the "Look up on archive" and "Scan page for archives" right-click menu items.                                                                                                                    |
+| `storage`                                | To save your settings (auto-scan toggle, site list, UI preferences) and to cache archive lookup results locally so the same URL is not looked up more than once every 24 hours.                         |
+| `activeTab`                              | To read the current tab's hostname when you click "Add current site" in the popup, and to send scan messages to the content script.                                                                     |
 | Host permissions for web archive domains | To make network requests to the web archive service's TimeMap API, which is how the extension checks whether a snapshot of a URL exists. Without this, Chrome would block the requests as cross-origin. |
 
 ---

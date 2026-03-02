@@ -25,6 +25,7 @@ Right-click a link and choose the archive lookup option to open the most recent 
 Right-click the page background and choose "Scan page for archives". The extension checks every visible article link on the page and places a small archive icon next to each one that has a saved snapshot. Click any icon to open that snapshot.
 
 The scanner is smart about what it checks:
+
 - Only links that match the current site's domain are included, so navigation and footer links are ignored.
 - Only links that look like articles are checked — short home-page or category links are skipped automatically.
 - Duplicate links are deduplicated, so each URL is only checked once.
@@ -47,6 +48,7 @@ An optional debug mode logs detailed scan activity to the browser console, usefu
 
 **Permissions**
 The extension requests only the permissions it needs:
+
 - `contextMenus` — to add the right-click menu items.
 - `storage` — to save your settings and the 24-hour lookup cache.
 - `activeTab` — to read links on the current page when you trigger a scan.
