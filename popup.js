@@ -40,20 +40,35 @@ function renderSiteList() {
   }
 }
 
-function addSite(raw) {
+async function addSite(raw) {
   const domain = normalizeDomain(raw);
   if (!domain || domain.length < 3 || !domain.includes('.')) return;
   if (autoScanSites.includes(domain)) return;
+
+  // Save first — permissions.request() may close the popup, so the site
+  // must be in storage before the dialog opens.
   autoScanSites.push(domain);
   autoScanSites.sort();
   chrome.storage.sync.set({ autoScanSites });
   renderSiteList();
+
+  const origins = [`*://*.${domain}/*`, `*://${domain}/*`];
+  const granted = await chrome.permissions.request({ origins });
+  if (!granted) {
+    // Popup survived the dialog — undo the save
+    autoScanSites = autoScanSites.filter((s) => s !== domain);
+    chrome.storage.sync.set({ autoScanSites });
+    renderSiteList();
+  }
 }
 
-function removeSite(domain) {
+async function removeSite(domain) {
   autoScanSites = autoScanSites.filter((s) => s !== domain);
   chrome.storage.sync.set({ autoScanSites });
   renderSiteList();
+
+  const origins = [`*://*.${domain}/*`, `*://${domain}/*`];
+  await chrome.permissions.remove({ origins }).catch(() => {});
 }
 
 chrome.storage.sync.get(

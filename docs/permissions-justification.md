@@ -98,40 +98,54 @@ archive lookups would silently fail.
 
 ---
 
-## Content Script Match Pattern: `<all_urls>`
+### `scripting`
 
-**Justification:** The content script (`content.js`) must be able to run on any website the user
-visits, because the extension's core feature — scanning the current page for links that have
-archived snapshots — is inherently page-agnostic. The user may wish to scan news sites, blogs,
-aggregators, or any other page containing article links.
+**Justification:** The extension uses the `chrome.scripting` API for two purposes:
 
-**What the content script actually does on each page:**
+1. **On-demand injection** — When the user right-clicks and selects "Scan page for archives",
+   `background.js` uses `chrome.scripting.executeScript` and `chrome.scripting.insertCSS` to inject
+   the content script and stylesheet into the active tab. The `activeTab` permission (granted by the
+   context menu interaction) authorizes this injection without requiring broad host permissions.
 
-1. On load, `init()` reads user preferences from `chrome.storage.sync`. If auto-scan is enabled
-   and the current page's hostname is in the user-configured `autoScanSites` allowlist, the script
-   begins scanning; otherwise it does nothing. This means the script is entirely passive on pages
-   not in the allowlist unless the user explicitly triggers a scan via the context menu.
+2. **Dynamic content script registration** — When the user adds a site to the auto-scan allowlist,
+   `background.js` calls `chrome.scripting.registerContentScripts` to register a dynamic content
+   script targeting only the allowlisted domains. This replaces the previous `<all_urls>` match
+   pattern in `content_scripts` with precise, user-controlled domain targeting. Registrations use
+   `persistAcrossSessions: true` so they survive browser restarts.
 
-2. When scanning, `collectNewLinks()` queries the DOM for `<a href>` elements whose `href`
-   contains the current page's own hostname, filters to links that are within the viewport, that
-   are not wrapping an `<img>` element, and that match article-like URL patterns (e.g. date
-   segments, `/article/`, `/story/`, slug-length heuristics). Only matching links are sent to the
-   background worker for archive lookup.
+**Without it:** The extension could not inject its content script on demand (for manual scans) or
+dynamically register content scripts for auto-scan sites at runtime.
 
-3. If a snapshot URL is returned, the script inserts a small `<a>` element with an archive icon
-   immediately after the original link (via `insertAdjacentElement('afterend', indicator)`),
-   pointing to the archived snapshot. No other DOM modification or data collection occurs.
+---
 
-4. For on-demand scans triggered via the context menu, the content script receives a `scan-page`
-   message and executes the same scan flow regardless of the auto-scan allowlist, honouring the
-   user's explicit intent.
+## Optional Host Permissions
 
-**A narrower match pattern is not technically feasible** because the set of sites a user may want
-to scan is open-ended and user-defined at runtime (via the `autoScanSites` preference), and
-on-demand scans can be triggered on any page at any time. The `<all_urls>` pattern is the only way
-to support both use cases.
+### `optional_host_permissions: ["*://*/*"]`
+
+**Justification:** The extension declares `*://*/*` as an optional host permission so it can
+request access to specific sites at runtime when the user adds them to the auto-scan allowlist.
+When the user adds a site in the popup, `chrome.permissions.request` prompts the user to grant
+access to that specific domain. When the user removes a site, the permission is revoked via
+`chrome.permissions.remove`.
+
+This approach means the extension has **zero host permissions by default**. Permissions are
+acquired incrementally and only for sites the user explicitly chooses. The browser's permission
+prompt ensures the user is always in control.
+
+**What the content script does on auto-scan sites:**
+
+1. On page load, `init()` reads user preferences from `chrome.storage.sync`. If auto-scan is
+   enabled and the current page's hostname is in the allowlist, the script scans visible article
+   links.
+
+2. `collectNewLinks()` queries the DOM for `<a href>` elements whose `href` contains the current
+   page's own hostname, filters to links within the viewport that are not wrapping `<img>` elements
+   and that match article-like URL patterns. Only matching links are sent to the background worker
+   for archive lookup.
+
+3. If a snapshot URL is returned, a small archive icon is appended to the link. No other DOM
+   modification or data collection occurs.
 
 **The script does not read, transmit, or store any page content, user input, or browsing history.**
-It only inspects the `href` attributes of anchor elements already present in the DOM for the
-purpose of constructing archive lookup requests, and all network requests are made by the
-background service worker, not the content script itself.
+It only inspects `href` attributes of anchor elements for the purpose of constructing archive
+lookup requests.

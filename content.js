@@ -90,7 +90,11 @@ function hideStatus() {
 }
 
 // --- Message listener ---
-chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.action === 'ping') {
+    sendResponse({ pong: true });
+    return;
+  }
   if (message.action === 'scan-page') {
     currentScanIsManual = true;
     // Reset stats for fresh banner on manual scan

@@ -26,6 +26,8 @@ beforeEach(async () => {
   });
   chrome.storage.sync.set.mockClear();
   chrome.tabs.query.mockClear();
+  chrome.permissions.request.mockReset().mockResolvedValue(true);
+  chrome.permissions.remove.mockReset().mockResolvedValue(true);
 
   mod = await import('../popup.js');
 });
@@ -73,62 +75,79 @@ describe('normalizeDomain', () => {
 });
 
 describe('addSite', () => {
-  test('adds valid domain to list', () => {
-    mod.addSite('nytimes.com');
+  test('adds valid domain to list', async () => {
+    await mod.addSite('nytimes.com');
+    expect(chrome.permissions.request).toHaveBeenCalledWith({
+      origins: ['*://*.nytimes.com/*', '*://nytimes.com/*'],
+    });
     expect(chrome.storage.sync.set).toHaveBeenCalledWith({
       autoScanSites: ['nytimes.com'],
     });
   });
 
-  test('rejects domain shorter than 3 chars', () => {
-    mod.addSite('ab');
+  test('undoes save when permission denied', async () => {
+    chrome.permissions.request.mockResolvedValue(false);
+    await mod.addSite('nytimes.com');
+    expect(chrome.permissions.request).toHaveBeenCalled();
+    // First call saves, second call undoes
+    expect(chrome.storage.sync.set).toHaveBeenCalledTimes(2);
+    expect(chrome.storage.sync.set).toHaveBeenLastCalledWith({
+      autoScanSites: [],
+    });
+  });
+
+  test('rejects domain shorter than 3 chars', async () => {
+    await mod.addSite('ab');
     expect(chrome.storage.sync.set).not.toHaveBeenCalled();
   });
 
-  test('rejects domain without dot', () => {
-    mod.addSite('localhost');
+  test('rejects domain without dot', async () => {
+    await mod.addSite('localhost');
     expect(chrome.storage.sync.set).not.toHaveBeenCalled();
   });
 
-  test('rejects empty input', () => {
-    mod.addSite('');
+  test('rejects empty input', async () => {
+    await mod.addSite('');
     expect(chrome.storage.sync.set).not.toHaveBeenCalled();
   });
 
-  test('does not add duplicate domain', () => {
-    mod.addSite('nytimes.com');
+  test('does not add duplicate domain', async () => {
+    await mod.addSite('nytimes.com');
     chrome.storage.sync.set.mockClear();
-    mod.addSite('nytimes.com');
+    await mod.addSite('nytimes.com');
     expect(chrome.storage.sync.set).not.toHaveBeenCalled();
   });
 
-  test('normalizes before adding', () => {
-    mod.addSite('https://www.nytimes.com/section');
+  test('normalizes before adding', async () => {
+    await mod.addSite('https://www.nytimes.com/section');
     expect(chrome.storage.sync.set).toHaveBeenCalledWith({
       autoScanSites: ['nytimes.com'],
     });
   });
 
-  test('keeps list sorted', () => {
-    mod.addSite('zzz.com');
-    mod.addSite('aaa.com');
+  test('keeps list sorted', async () => {
+    await mod.addSite('zzz.com');
+    await mod.addSite('aaa.com');
     const lastCall = chrome.storage.sync.set.mock.calls.at(-1)[0];
     expect(lastCall.autoScanSites).toEqual(['aaa.com', 'zzz.com']);
   });
 });
 
 describe('removeSite', () => {
-  test('removes domain from list', () => {
-    mod.addSite('nytimes.com');
+  test('removes domain from list and revokes permission', async () => {
+    await mod.addSite('nytimes.com');
     chrome.storage.sync.set.mockClear();
-    mod.removeSite('nytimes.com');
+    await mod.removeSite('nytimes.com');
     expect(chrome.storage.sync.set).toHaveBeenCalledWith({
       autoScanSites: [],
     });
+    expect(chrome.permissions.remove).toHaveBeenCalledWith({
+      origins: ['*://*.nytimes.com/*', '*://nytimes.com/*'],
+    });
   });
 
-  test('no-op for domain not in list', () => {
-    mod.removeSite('notinlist.com');
+  test('no-op for domain not in list', async () => {
+    await mod.removeSite('notinlist.com');
     expect(chrome.storage.sync.set).toHaveBeenCalledWith({
       autoScanSites: [],
     });
@@ -136,9 +155,9 @@ describe('removeSite', () => {
 });
 
 describe('renderSiteList', () => {
-  test('renders site items into DOM', () => {
-    mod.addSite('example.com');
-    mod.addSite('test.org');
+  test('renders site items into DOM', async () => {
+    await mod.addSite('example.com');
+    await mod.addSite('test.org');
 
     const items = document.querySelectorAll('#site-list li');
     expect(items.length).toBe(2);
@@ -154,18 +173,21 @@ describe('renderSiteList', () => {
     expect(emptyEl.style.display).toBe('block');
   });
 
-  test('hides empty message when sites exist', () => {
-    mod.addSite('example.com');
+  test('hides empty message when sites exist', async () => {
+    await mod.addSite('example.com');
     const emptyEl = document.getElementById('site-empty');
     expect(emptyEl.style.display).toBe('none');
   });
 
-  test('remove button removes site on click', () => {
-    mod.addSite('example.com');
+  test('remove button removes site on click', async () => {
+    await mod.addSite('example.com');
     chrome.storage.sync.set.mockClear();
 
     const removeBtn = document.querySelector('#site-list .site-remove');
     removeBtn.click();
+
+    // Wait for async removeSite to complete
+    await new Promise((r) => setTimeout(r, 0));
 
     expect(chrome.storage.sync.set).toHaveBeenCalledWith({
       autoScanSites: [],

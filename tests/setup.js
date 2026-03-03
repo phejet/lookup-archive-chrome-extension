@@ -33,6 +33,16 @@ const chromeMock = {
     query: vi.fn(),
     sendMessage: vi.fn(),
   },
+  scripting: {
+    executeScript: vi.fn().mockResolvedValue(undefined),
+    insertCSS: vi.fn().mockResolvedValue(undefined),
+    registerContentScripts: vi.fn().mockResolvedValue(undefined),
+    unregisterContentScripts: vi.fn().mockResolvedValue(undefined),
+  },
+  permissions: {
+    request: vi.fn().mockResolvedValue(true),
+    remove: vi.fn().mockResolvedValue(true),
+  },
 };
 vi.stubGlobal('chrome', chromeMock);
 

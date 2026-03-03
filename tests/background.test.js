@@ -9,6 +9,10 @@ beforeEach(async () => {
   chrome.storage.local.set.mockResolvedValue(undefined);
   chrome.storage.local.remove.mockResolvedValue(undefined);
   chrome.storage.sync.remove.mockResolvedValue(undefined);
+  chrome.scripting.registerContentScripts.mockReset().mockResolvedValue(undefined);
+  chrome.scripting.unregisterContentScripts.mockReset().mockResolvedValue(undefined);
+  chrome.scripting.executeScript.mockReset().mockResolvedValue(undefined);
+  chrome.scripting.insertCSS.mockReset().mockResolvedValue(undefined);
   fetch.mockReset();
 
   mod = await import('../background.js');
@@ -49,12 +53,23 @@ describe('getCached', () => {
     expect(chrome.storage.local.remove).toHaveBeenCalledWith(key);
   });
 
-  test('returns null snapshotUrl for negative cache hit', async () => {
+  test('returns null snapshotUrl for fresh negative cache hit', async () => {
     const key = mod.cacheKey('https://example.com');
     chrome.storage.local.get.mockResolvedValue({
       [key]: { snapshotUrl: null, timestamp: Date.now() },
     });
     expect(await mod.getCached('https://example.com')).toBeNull();
+  });
+
+  test('expires negative cache after shorter TTL', async () => {
+    const key = mod.cacheKey('https://example.com');
+    const staleTs = Date.now() - mod.NEGATIVE_CACHE_TTL_MS - 1000; // just past 2h
+    chrome.storage.local.get.mockResolvedValue({
+      [key]: { snapshotUrl: null, timestamp: staleTs },
+    });
+    const result = await mod.getCached('https://example.com');
+    expect(result).toBeUndefined();
+    expect(chrome.storage.local.remove).toHaveBeenCalledWith(key);
   });
 });
 
@@ -215,6 +230,18 @@ describe('checkBatchCacheOnly', () => {
     expect(results['https://c.com']).toBeUndefined();
   });
 
+  test('expires negative cache entries after shorter TTL', async () => {
+    const urls = ['https://a.com'];
+    chrome.storage.local.get.mockResolvedValue({
+      ['cache_https://a.com']: {
+        snapshotUrl: null,
+        timestamp: Date.now() - 3 * 60 * 60 * 1000, // 3 hours ago (past 2h negative TTL)
+      },
+    });
+    const results = await mod.checkBatchCacheOnly(urls);
+    expect(results['https://a.com']).toBeUndefined();
+  });
+
   test('returns empty object when nothing cached', async () => {
     chrome.storage.local.get.mockResolvedValue({});
     const results = await mod.checkBatchCacheOnly(['https://x.com']);
@@ -248,5 +275,117 @@ describe('checkBatch', () => {
     );
     // fetch should only be called for uncached URL
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('syncContentScriptRegistrations', () => {
+  test('unregisters and registers for allowlisted sites', async () => {
+    await mod.syncContentScriptRegistrations(['nytimes.com', 'wsj.com']);
+
+    expect(chrome.scripting.unregisterContentScripts).toHaveBeenCalledWith({
+      ids: ['auto-scan'],
+    });
+    expect(chrome.scripting.registerContentScripts).toHaveBeenCalledWith([
+      {
+        id: 'auto-scan',
+        matches: [
+          '*://*.nytimes.com/*',
+          '*://nytimes.com/*',
+          '*://*.wsj.com/*',
+          '*://wsj.com/*',
+        ],
+        js: ['content.js'],
+        css: ['styles.css'],
+        runAt: 'document_idle',
+        persistAcrossSessions: true,
+      },
+    ]);
+  });
+
+  test('only unregisters when sites list is empty', async () => {
+    await mod.syncContentScriptRegistrations([]);
+
+    expect(chrome.scripting.unregisterContentScripts).toHaveBeenCalledWith({
+      ids: ['auto-scan'],
+    });
+    expect(chrome.scripting.registerContentScripts).not.toHaveBeenCalled();
+  });
+
+  test('does not throw if unregister fails (no existing registration)', async () => {
+    chrome.scripting.unregisterContentScripts.mockRejectedValue(new Error('not found'));
+    await expect(mod.syncContentScriptRegistrations(['example.com'])).resolves.not.toThrow();
+    expect(chrome.scripting.registerContentScripts).toHaveBeenCalled();
+  });
+});
+
+describe('scan-page context menu handler', () => {
+  test('injects content script when ping fails then sends scan-page', async () => {
+    const clickHandler = chrome.contextMenus.onClicked.addListener.mock.calls[0][0];
+    const tab = { id: 42 };
+
+    // First ping fails (no content script), then post-injection ping succeeds
+    chrome.tabs.sendMessage
+      .mockRejectedValueOnce(new Error('no receiver'))
+      .mockResolvedValueOnce({ pong: true })
+      .mockResolvedValueOnce(undefined);
+
+    await clickHandler({ menuItemId: 'scan-page' }, tab);
+
+    expect(chrome.scripting.insertCSS).toHaveBeenCalledWith({
+      target: { tabId: 42 },
+      files: ['styles.css'],
+    });
+    expect(chrome.scripting.executeScript).toHaveBeenCalledWith({
+      target: { tabId: 42 },
+      files: ['content.js'],
+    });
+    // Last sendMessage call is scan-page
+    expect(chrome.tabs.sendMessage).toHaveBeenLastCalledWith(42, { action: 'scan-page' });
+  });
+
+  test('skips injection when ping succeeds', async () => {
+    const clickHandler = chrome.contextMenus.onClicked.addListener.mock.calls[0][0];
+    const tab = { id: 42 };
+
+    // Ping succeeds — content script already injected
+    chrome.tabs.sendMessage.mockResolvedValueOnce({ pong: true });
+
+    await clickHandler({ menuItemId: 'scan-page' }, tab);
+
+    expect(chrome.scripting.insertCSS).not.toHaveBeenCalled();
+    expect(chrome.scripting.executeScript).not.toHaveBeenCalled();
+    expect(chrome.tabs.sendMessage).toHaveBeenLastCalledWith(42, { action: 'scan-page' });
+  });
+});
+
+describe('injectIntoMatchingTabs', () => {
+  test('injects into open tabs that match sites and have no content script', async () => {
+    chrome.tabs.query.mockResolvedValue([{ id: 10 }, { id: 20 }]);
+    // Tab 10: no content script (ping fails), Tab 20: already has content script
+    chrome.tabs.sendMessage
+      .mockRejectedValueOnce(new Error('no receiver'))
+      .mockResolvedValueOnce({ pong: true })
+      .mockResolvedValue(undefined);
+
+    await mod.injectIntoMatchingTabs(['nytimes.com']);
+
+    expect(chrome.tabs.query).toHaveBeenCalledWith({
+      url: ['*://*.nytimes.com/*', '*://nytimes.com/*'],
+    });
+    // Tab 10 gets injected
+    expect(chrome.scripting.executeScript).toHaveBeenCalledWith({
+      target: { tabId: 10 },
+      files: ['content.js'],
+    });
+    // Tab 20 gets a scan-page message instead
+    expect(chrome.scripting.executeScript).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not throw on non-injectable tabs', async () => {
+    chrome.tabs.query.mockResolvedValue([{ id: 99 }]);
+    chrome.tabs.sendMessage.mockRejectedValue(new Error('no receiver'));
+    chrome.scripting.executeScript.mockRejectedValue(new Error('cannot access'));
+
+    await expect(mod.injectIntoMatchingTabs(['example.com'])).resolves.not.toThrow();
   });
 });
