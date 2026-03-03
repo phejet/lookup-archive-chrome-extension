@@ -1,6 +1,6 @@
 # Privacy Policy — Archive Lookup
 
-_Last updated: March 1, 2026_
+_Last updated: March 3, 2026_
 
 Archive Lookup is a Chrome extension that helps you find archived snapshots of web pages. This policy explains exactly what data the extension accesses, what it stores, and what it sends over the network.
 
@@ -20,12 +20,14 @@ When you use Archive Lookup, it:
 
 The extension requests the following Chrome permissions:
 
-| Permission                               | Why it is needed                                                                                                                                                                                        |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `contextMenus`                           | To add the "Look up on archive" and "Scan page for archives" right-click menu items.                                                                                                                    |
-| `storage`                                | To save your settings (auto-scan toggle, site list, UI preferences) and to cache archive lookup results locally so the same URL is not looked up more than once every 24 hours.                         |
-| `activeTab`                              | To read the current tab's hostname when you click "Add current site" in the popup, and to send scan messages to the content script.                                                                     |
-| Host permissions for web archive domains | To make network requests to the web archive service's TimeMap API, which is how the extension checks whether a snapshot of a URL exists. Without this, Chrome would block the requests as cross-origin. |
+| Permission                               | Why it is needed                                                                                                                                                                                                                                                           |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contextMenus`                           | To add the "Look up on archive" and "Scan page for archives" right-click menu items.                                                                                                                                                                                       |
+| `storage`                                | To save your settings (auto-scan toggle, site list, UI preferences) and to cache archive lookup results locally so the same URL is not looked up more than once every 24 hours.                                                                                            |
+| `activeTab`                              | To inject the content script on demand when you right-click "Scan page for archives", and to read the current tab's hostname when you click "Add current site" in the popup.                                                                                               |
+| `scripting`                              | To inject the content script and stylesheet into pages (on-demand via `activeTab`, or dynamically registered for auto-scan sites).                                                                                                                                         |
+| Host permissions for web archive domains | To make network requests to the web archive service's TimeMap API, which is how the extension checks whether a snapshot of a URL exists. Without this, Chrome would block the requests as cross-origin.                                                                    |
+| Optional host permissions                | The extension starts with **zero** host permissions for user sites. When you add a domain to the auto-scan allowlist, Chrome prompts you to grant access to that specific domain. Removing a domain revokes the permission. No broad host access is requested or required. |
 
 ---
 
@@ -80,7 +82,7 @@ The extension has no control over the archive service's data practices. You shou
 
 ## What the extension does NOT do
 
-- It does not read the content of pages you visit (it only reads the `href` attributes of links already present in the page DOM).
+- It does not read the content of pages you visit (it only reads the `href` attributes of links already present in the page DOM, and only on sites you have explicitly allowed or manually triggered a scan on).
 - It does not record your browsing history.
 - It does not transmit your settings or site list to any server.
 - It does not use cookies.

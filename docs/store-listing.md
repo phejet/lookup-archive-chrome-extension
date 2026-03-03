@@ -46,13 +46,8 @@ An optional progress banner (toggled in the popup) shows live scanning statistic
 **Debug logging**
 An optional debug mode logs detailed scan activity to the browser console, useful for diagnosing unexpected behaviour.
 
-**Permissions**
-The extension requests only the permissions it needs:
-
-- `contextMenus` — to add the right-click menu items.
-- `storage` — to save your settings and the 24-hour lookup cache.
-- `activeTab` — to read links on the current page when you trigger a scan.
-- Host access to the archive service domains — to query the Memento TimeMap API that reports whether a snapshot exists.
+**Minimal permissions**
+The extension starts with zero host permissions. When you add a site to the auto-scan allowlist, Chrome prompts you to grant access to that specific domain — and only that domain. Removing a site revokes the permission. Manual scans ("Scan page for archives") work on any page through the `activeTab` permission, which is granted temporarily each time you right-click.
 
 No browsing history is collected or transmitted anywhere other than the archive service you are querying.
 

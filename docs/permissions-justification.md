@@ -54,19 +54,20 @@ causing unnecessary network traffic and making scans significantly slower. User 
 
 **Justification:** The extension uses `activeTab` in two places:
 
-1. When the user selects "Scan page for archives" from the context menu, `background.js` calls
-   `chrome.tabs.sendMessage(tab.id, { action: 'scan-page' })` to instruct the content script in
-   the active tab to run a scan. The `activeTab` permission grants the extension temporary access
-   to the active tab when invoked via the context menu.
+1. When the user selects "Scan page for archives" from the context menu, `background.js` uses
+   `chrome.scripting.executeScript` and `chrome.scripting.insertCSS` to inject the content script
+   and stylesheet into the active tab, then sends a `scan-page` message. The `activeTab` permission
+   grants temporary host access to the active tab when invoked via the context menu, allowing
+   injection without requiring any persistent host permissions.
 
 2. In the popup (`popup.js`), the "Add current site" button calls
    `chrome.tabs.query({ active: true, currentWindow: true })` and reads `tabs[0].url` to extract
    the current site's hostname. The `activeTab` permission is required for `tab.url` to be
    populated in the query result.
 
-**Without it:** The context menu scan trigger and the "Add current site" popup button would both
-fail. The extension could not determine the active tab's URL or communicate with its content
-script when invoked by the user.
+**Without it:** The extension could not inject its content script for manual scans (since it has no
+persistent host permissions for arbitrary sites), and the "Add current site" popup button could not
+read the active tab's URL.
 
 ---
 
@@ -109,8 +110,8 @@ archive lookups would silently fail.
 
 2. **Dynamic content script registration** — When the user adds a site to the auto-scan allowlist,
    `background.js` calls `chrome.scripting.registerContentScripts` to register a dynamic content
-   script targeting only the allowlisted domains. This replaces the previous `<all_urls>` match
-   pattern in `content_scripts` with precise, user-controlled domain targeting. Registrations use
+   script targeting only the allowlisted domains, providing precise, user-controlled domain
+   targeting instead of broad host permissions. Registrations use
    `persistAcrossSessions: true` so they survive browser restarts.
 
 **Without it:** The extension could not inject its content script on demand (for manual scans) or

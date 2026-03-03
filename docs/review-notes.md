@@ -1,5 +1,42 @@
 # Review Notes — Store Documentation Edits
 
+## Changes made (March 3, 2026)
+
+### Replaced `<all_urls>` with dynamic per-site permissions
+
+The extension no longer declares a `content_scripts` block with `<all_urls>` in `manifest.json`.
+Instead it uses:
+
+- **`activeTab`** — grants temporary access when the user right-clicks "Scan page for archives".
+  The background script uses `chrome.scripting.executeScript` to inject the content script on
+  demand. No broad host permission is needed for manual scans.
+- **`optional_host_permissions: ["*://*/*"]`** — when the user adds a site to the auto-scan
+  allowlist in the popup, `chrome.permissions.request` prompts for access to that specific domain.
+  Removing a site revokes the permission via `chrome.permissions.remove`.
+- **`chrome.scripting.registerContentScripts`** — dynamically registers content scripts for only
+  the allowlisted domains. Uses `persistAcrossSessions: true` so registrations survive browser
+  restarts. Chrome handles injection natively on page load.
+- **`scripting` permission** — added to `manifest.json` to enable the above APIs.
+
+All four documentation files were updated to reflect the new permission model:
+
+- **permissions-justification.md**: Replaced the `<all_urls>` content script section with new
+  `scripting` and `optional_host_permissions` sections explaining the dynamic registration and
+  per-site permission approach.
+- **privacy-policy.md**: Updated the permissions table to include `scripting` and optional host
+  permissions. Updated the "last updated" date. Clarified that the content script only runs on
+  sites the user has explicitly allowed or manually triggered a scan on.
+- **store-listing.md**: Replaced the permissions bullet list with a "Minimal permissions"
+  paragraph explaining the zero-default-permissions model.
+- **review-notes.md**: This file — documents the changes.
+
+### Negative cache TTL reduced
+
+Negative cache entries (URLs with no archived snapshot) now expire after 2 hours instead of 24
+hours. This prevents stale "not found" results from persisting after an archive is created.
+
+---
+
 ## Changes made (March 1, 2026)
 
 ### archive.today name references removed
@@ -36,8 +73,6 @@ The section was rewritten to cover both use cases accurately.
 ### No other issues found
 
 - All permission claims match the actual `manifest.json` entries and code usage.
-- The `<all_urls>` content script justification is thorough and accurately describes the filtering
-  logic in `collectNewLinks()`.
 - Cache TTL, storage areas, and network request descriptions all match the source code.
 - The privacy policy covers all data flows and has appropriate sections for children's privacy,
   third-party services, and a "what we do not do" list.

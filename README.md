@@ -14,7 +14,8 @@ A Chrome extension for quickly looking up archived snapshots of web pages on [ar
 - **Auto-scan** — automatically scans pages on configured sites as they load and as you scroll. Add domains to the allowlist in the extension popup to enable this.
 - **Snapshot age tooltips** — hover over an archive icon to see how old the snapshot is (e.g., "Archived 3 days ago")
 - **Smart filtering** — automatically matches the current site's domain, deduplicates links, skips non-article URLs, and only checks links visible on screen
-- **24-hour cache** — avoids redundant requests to archive.today
+- **Minimal permissions** — starts with zero host permissions. Manual scans use `activeTab` (granted per right-click). Auto-scan sites are granted individually via a Chrome permission prompt when you add them.
+- **24-hour cache** — avoids redundant requests to archive.today (negative results expire after 2 hours)
 
 ## How it works
 
