@@ -32,23 +32,35 @@ STORE_DOCS = [
 
 
 def main():
-    # Clean and create output directory
+    # Clean and recreate output directory
     if OUTPUT_DIR.exists():
         shutil.rmtree(OUTPUT_DIR)
     OUTPUT_DIR.mkdir()
 
-    # --- 1. Build the extension zip ---
+    # --- 1. Build unpacked extension directory ---
+    unpacked_dir = OUTPUT_DIR / "archive-lookup"
+    unpacked_dir.mkdir()
+    for rel in EXTENSION_FILES:
+        src = ROOT / rel
+        if not src.exists():
+            print(f"WARNING: missing extension file: {rel}")
+            continue
+        dest = unpacked_dir / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+    print(f"Created unpacked directory: {unpacked_dir}")
+
+    # --- 2. Build the extension zip ---
     zip_path = OUTPUT_DIR / "archive-lookup.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for rel in EXTENSION_FILES:
             src = ROOT / rel
             if not src.exists():
-                print(f"WARNING: missing extension file: {rel}")
                 continue
             zf.write(src, rel)
     print(f"Created {zip_path}")
 
-    # --- 2. Copy promo materials ---
+    # --- 3. Copy promo materials ---
     promo_out = OUTPUT_DIR / "promo"
     promo_out.mkdir()
     if PROMO_DIR.exists():
@@ -59,7 +71,7 @@ def main():
     else:
         print(f"WARNING: promo-package directory not found at {PROMO_DIR}")
 
-    # --- 3. Copy store listing docs ---
+    # --- 4. Copy store listing docs ---
     docs_out = OUTPUT_DIR / "docs"
     docs_out.mkdir()
     for rel in STORE_DOCS:

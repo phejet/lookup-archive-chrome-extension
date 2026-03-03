@@ -4,9 +4,9 @@ let mod;
 
 function setupPopupDOM() {
   document.body.innerHTML = `
-    <input type="checkbox" id="auto-scan" />
-    <input type="checkbox" id="show-progress" />
-    <input type="checkbox" id="debug-logging" />
+    <input type="hidden" id="auto-scan" />
+    <input type="hidden" id="show-progress" />
+    <input type="hidden" id="debug-logging" />
     <input type="text" id="site-input" />
     <button id="add-site-btn"></button>
     <button id="add-current-site-btn"></button>

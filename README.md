@@ -11,7 +11,7 @@ A Chrome extension for quickly looking up archived snapshots of web pages on [ar
 
 - **Right-click any link → "Look up on Archive.today"** — opens the latest archived snapshot in a new tab
 - **Right-click page → "Scan page for archives"** — scans visible article links and adds a small archive icon next to those with available snapshots. Click the icon to open the snapshot.
-- **Auto-scan** — automatically scans pages on configured sites as they load and as you scroll. Add domains to the allowlist in the extension popup to enable this.
+- **Auto-scan** — automatically scans pages on your allowlisted sites as they load and as you scroll. Add domains in the extension popup — auto-scan is enabled by default.
 - **Snapshot age tooltips** — hover over an archive icon to see how old the snapshot is (e.g., "Archived 3 days ago")
 - **Smart filtering** — automatically matches the current site's domain, deduplicates links, skips non-article URLs, and only checks links visible on screen
 - **Minimal permissions** — starts with zero host permissions. Manual scans use `activeTab` (granted per right-click). Auto-scan sites are granted individually via a Chrome permission prompt when you add them.
@@ -37,9 +37,9 @@ For bulk checking, right-click the page background and select **"Scan page for a
 
 ### Auto-scan
 
-To have pages scanned automatically without right-clicking:
+Auto-scan is enabled by default. To set it up:
 
 1. Click the extension icon to open the popup
-2. Toggle **Auto-scan** on
-3. Add domains to the allowlist (e.g. `nytimes.com`) — type a domain and click **Add**, or click **Add current site**
+2. Add domains to the allowlist (e.g. `nytimes.com`) — type a domain and click **Add**, or click **Add current site**
+3. Chrome will prompt you to grant permission for each domain
 4. When you visit a page on an allowed domain, visible article links are scanned on load and as you scroll

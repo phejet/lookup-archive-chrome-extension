@@ -1,6 +1,3 @@
-const autoScanToggle = document.getElementById('auto-scan');
-const showProgressToggle = document.getElementById('show-progress');
-const debugLoggingToggle = document.getElementById('debug-logging');
 const siteInput = document.getElementById('site-input');
 const addSiteBtn = document.getElementById('add-site-btn');
 const addCurrentSiteBtn = document.getElementById('add-current-site-btn');
@@ -71,27 +68,9 @@ async function removeSite(domain) {
   await chrome.permissions.remove({ origins }).catch(() => {});
 }
 
-chrome.storage.sync.get(
-  { autoScan: false, autoScanSites: [], showOnDemandProgress: false, debugLogging: false },
-  (data) => {
-    autoScanToggle.checked = data.autoScan;
-    showProgressToggle.checked = data.showOnDemandProgress;
-    debugLoggingToggle.checked = data.debugLogging;
-    autoScanSites = data.autoScanSites;
-    renderSiteList();
-  },
-);
-
-autoScanToggle.addEventListener('change', () => {
-  chrome.storage.sync.set({ autoScan: autoScanToggle.checked });
-});
-
-showProgressToggle.addEventListener('change', () => {
-  chrome.storage.sync.set({ showOnDemandProgress: showProgressToggle.checked });
-});
-
-debugLoggingToggle.addEventListener('change', () => {
-  chrome.storage.sync.set({ debugLogging: debugLoggingToggle.checked });
+chrome.storage.sync.get({ autoScan: true, autoScanSites: [] }, (data) => {
+  autoScanSites = data.autoScanSites;
+  renderSiteList();
 });
 
 addSiteBtn.addEventListener('click', () => {

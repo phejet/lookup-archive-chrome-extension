@@ -38,7 +38,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   chrome.storage.sync.remove('prefixes');
 
   // Register content scripts for any existing allowlisted sites
-  const data = await chrome.storage.sync.get({ autoScan: false, autoScanSites: [] });
+  const data = await chrome.storage.sync.get({ autoScan: true, autoScanSites: [] });
   if (data.autoScan && data.autoScanSites.length > 0) {
     await syncContentScriptRegistrations(data.autoScanSites);
   }
@@ -48,7 +48,7 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
   if (area !== 'sync') return;
   if (!changes.autoScanSites && !changes.autoScan) return;
 
-  const data = await chrome.storage.sync.get({ autoScan: false, autoScanSites: [] });
+  const data = await chrome.storage.sync.get({ autoScan: true, autoScanSites: [] });
   if (data.autoScan && data.autoScanSites.length > 0) {
     await syncContentScriptRegistrations(data.autoScanSites);
     // Inject into already-open tabs that match the new allowlist

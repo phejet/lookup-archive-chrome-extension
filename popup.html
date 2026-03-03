@@ -162,16 +162,7 @@
       Right-click any link to look up its archived snapshot, or right-click the page to scan all
       visible links.
     </p>
-    <div class="toggle-row">
-      <div>
-        <div class="toggle-label">Auto-scan</div>
-        <div class="toggle-desc">Scan on page load and as you scroll</div>
-      </div>
-      <label class="switch" for="auto-scan">
-        <input type="checkbox" id="auto-scan" aria-label="Enable auto-scan" />
-        <span class="slider"></span>
-      </label>
-    </div>
+    <input type="hidden" id="auto-scan" />
     <div class="site-list-section" id="site-list-section">
       <div class="site-list-header">Auto-scan sites</div>
       <div class="site-list-desc">Only auto-scan on these domains</div>
@@ -185,26 +176,8 @@
         No sites configured. Auto-scan is disabled until you add sites.
       </div>
     </div>
-    <div class="toggle-row">
-      <div>
-        <div class="toggle-label">Show scan progress</div>
-        <div class="toggle-desc">Display progress for on-demand scans</div>
-      </div>
-      <label class="switch" for="show-progress">
-        <input type="checkbox" id="show-progress" aria-label="Show scan progress" />
-        <span class="slider"></span>
-      </label>
-    </div>
-    <div class="toggle-row">
-      <div>
-        <div class="toggle-label">Debug logging</div>
-        <div class="toggle-desc">Log scan activity to the browser console</div>
-      </div>
-      <label class="switch" for="debug-logging">
-        <input type="checkbox" id="debug-logging" aria-label="Enable debug logging" />
-        <span class="slider"></span>
-      </label>
-    </div>
+    <input type="hidden" id="show-progress" />
+    <input type="hidden" id="debug-logging" />
     <div style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 4px; text-align: center">
       <a
         href="https://buymeacoffee.com/fumbledpelican"

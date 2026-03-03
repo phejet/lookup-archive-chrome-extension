@@ -47,10 +47,7 @@ The extension stores two categories of data in your browser using `chrome.storag
 
 **Settings (synced across your Chrome profile via `chrome.storage.sync`):**
 
-- Whether automatic scanning is enabled (`autoScan`).
 - The list of domain names you have configured for automatic scanning (`autoScanSites`).
-- Whether the on-demand scan progress banner is shown (`showOnDemandProgress`).
-- Whether debug logging is enabled (`debugLogging`).
 
 These settings sync across devices if you are signed into Chrome with sync enabled. They are controlled entirely by you through the extension popup and can be changed or cleared at any time.
 

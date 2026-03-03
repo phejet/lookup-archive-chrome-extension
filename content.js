@@ -12,10 +12,10 @@ const iconTemplate = (() => {
 })();
 
 const checkedUrls = new Set();
-let isAutoScan = false;
+let isAutoScan = true;
 let autoScanSites = [];
-let showOnDemandProgress = false;
-let debugLogging = false;
+let showOnDemandProgress = true;
+let debugLogging = true;
 let currentScanIsManual = false;
 
 function isCurrentSiteAllowed() {
@@ -562,10 +562,10 @@ function stopScrollDetection() {
 // --- Init ---
 async function init() {
   const data = await chrome.storage.sync.get({
-    autoScan: false,
+    autoScan: true,
     autoScanSites: [],
-    showOnDemandProgress: false,
-    debugLogging: false,
+    showOnDemandProgress: true,
+    debugLogging: true,
   });
   isAutoScan = data.autoScan;
   autoScanSites = data.autoScanSites;

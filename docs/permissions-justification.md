@@ -39,10 +39,9 @@ trigger an on-demand page scan. The right-click workflow would not function.
   network requests to the web archive service's TimeMap API for URLs that have already been
   checked. The `getCached`, `setCache`, `checkBatch`, and `checkBatchCacheOnly` functions all read
   from and write to this cache.
-- `chrome.storage.sync` — used in `content.js` (`init` function) and `popup.js` to persist user
-  preferences: `autoScan` (boolean), `autoScanSites` (list of hostnames), `showOnDemandProgress`
-  (boolean), and `debugLogging` (boolean). Sync storage allows these settings to roam across the
-  user's devices.
+- `chrome.storage.sync` — used in `content.js` (`init` function) and `popup.js` to persist the
+  user's auto-scan site allowlist (`autoScanSites`, a list of hostnames). Sync storage allows this
+  setting to roam across the user's devices.
 
 **Without it:** Every page load and every scan would re-query the remote API for every link,
 causing unnecessary network traffic and making scans significantly slower. User preferences
