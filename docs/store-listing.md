@@ -32,7 +32,7 @@ The scanner is smart about what it checks:
 - Only links visible on screen at the time of the scan are included, so you are not waiting on content you cannot see yet.
 
 **Auto-scan mode**
-Enable Auto-scan in the extension popup to have pages checked automatically whenever you visit an allowed site — no right-clicking required. Add domains to the allowlist one at a time, or click "Add current site" to add whatever site you are on. Once enabled, the extension scans on page load and re-scans as you scroll down, picking up newly visible links each time you move the viewport by more than a quarter of the screen height.
+Auto-scan is enabled by default. Add domains to the allowlist in the extension popup one at a time, or click "Add current site" to add whatever site you are on. Chrome will prompt you to grant permission for each domain. Once a domain is added, the extension scans on page load and re-scans as you scroll down, picking up newly visible links each time you move the viewport by more than a quarter of the screen height.
 
 **Priority-based checking**
 When scanning, links closest to the centre of the visible screen are checked first, so the results most relevant to what you are reading appear soonest.
@@ -41,10 +41,7 @@ When scanning, links closest to the centre of the visible screen are checked fir
 Archive lookups are cached locally for 24 hours. Revisiting pages and re-scanning are fast, and no redundant network requests are made.
 
 **Scan progress**
-An optional progress banner (toggled in the popup) shows live scanning statistics — how many links have been checked, how many snapshots were found, and how long the scan took.
-
-**Debug logging**
-An optional debug mode logs detailed scan activity to the browser console, useful for diagnosing unexpected behaviour.
+A progress banner shows live scanning statistics — how many links have been checked, how many snapshots were found, and how long the scan took.
 
 **Minimal permissions**
 The extension starts with zero host permissions. When you add a site to the auto-scan allowlist, Chrome prompts you to grant access to that specific domain — and only that domain. Removing a site revokes the permission. Manual scans ("Scan page for archives") work on any page through the `activeTab` permission, which is granted temporarily each time you right-click.
