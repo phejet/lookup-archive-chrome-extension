@@ -3,7 +3,7 @@ import prettier from 'eslint-config-prettier';
 
 export default [
   {
-    ignores: ['node_modules/', 'eslint.config.mjs'],
+    ignores: ['node_modules/', 'eslint.config.mjs', 'chrome-extension-package/'],
   },
   js.configs.recommended,
   prettier,

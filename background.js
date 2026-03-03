@@ -59,7 +59,9 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
 });
 
 async function injectIntoMatchingTabs(sites) {
-  const tabs = await chrome.tabs.query({ url: sites.flatMap((s) => [`*://*.${s}/*`, `*://${s}/*`]) });
+  const tabs = await chrome.tabs.query({
+    url: sites.flatMap((s) => [`*://*.${s}/*`, `*://${s}/*`]),
+  });
   for (const tab of tabs) {
     try {
       // Skip if content script is already present

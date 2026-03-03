@@ -288,12 +288,7 @@ describe('syncContentScriptRegistrations', () => {
     expect(chrome.scripting.registerContentScripts).toHaveBeenCalledWith([
       {
         id: 'auto-scan',
-        matches: [
-          '*://*.nytimes.com/*',
-          '*://nytimes.com/*',
-          '*://*.wsj.com/*',
-          '*://wsj.com/*',
-        ],
+        matches: ['*://*.nytimes.com/*', '*://nytimes.com/*', '*://*.wsj.com/*', '*://wsj.com/*'],
         js: ['content.js'],
         css: ['styles.css'],
         runAt: 'document_idle',
