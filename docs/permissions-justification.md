@@ -22,6 +22,6 @@ scripting:
 
 Used for on-demand content script injection when the user triggers a manual scan via the context menu, and for dynamically registering content scripts on user-allowlisted auto-scan domains. Without this, the extension could not inject into pages for scanning.
 
-optional_host_permissions (_://_/\*):
+optional_host_permissions (`*://*/*`):
 
 The extension has zero host permissions by default. When a user adds a site to their auto-scan allowlist, it requests permission for that specific domain via the browser's permission prompt. When a site is removed, the permission is revoked. On allowlisted sites, the content script scans visible same-site article links, checks each against the archive API, and appends a small icon to links that have snapshots. It does not read, transmit, or store any page content, user input, or browsing history.
