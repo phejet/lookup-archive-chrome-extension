@@ -84,11 +84,11 @@ async function injectIntoMatchingTabs(sites) {
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'lookup-archive') {
-    // Open archive.today/newest/<url> directly — the browser follows the redirect
-    // If a snapshot exists, it lands on the snapshot. If not, archive.today shows a search page.
     const url = info.linkUrl;
+    if (!url || !(url.startsWith('http://') || url.startsWith('https://'))) return;
     chrome.tabs.create({ url: NEWEST_BASE + url });
   } else if (info.menuItemId === 'scan-page') {
+    if (!tab?.id) return;
     // Check if content script is already injected
     const alreadyInjected = await chrome.tabs
       .sendMessage(tab.id, { action: 'ping' })
@@ -174,7 +174,7 @@ async function checkBatch(urls) {
 
   // Only fetch uncached URLs (sequentially to respect rate limits)
   for (const url of uncachedUrls) {
-    results[url] = await checkArchive(url);
+    results[url] = await fetchAndCache(url);
   }
 
   return results;
@@ -202,13 +202,8 @@ function parseTimemap(body) {
   return null;
 }
 
-// Check if a URL has an archived snapshot using the Memento TimeMap API.
-// archive.is/timemap/<url> returns 200 with link-format data listing all mementos,
-// or 404 when no snapshots exist.
-async function checkArchive(url) {
-  const cached = await getCached(url);
-  if (cached !== undefined) return cached;
-
+// Fetch a URL's archived snapshot from the Memento TimeMap API and cache the result.
+async function fetchAndCache(url) {
   let snapshotUrl = null;
   try {
     const response = await fetch(TIMEMAP_BASE + url, {
@@ -224,6 +219,13 @@ async function checkArchive(url) {
 
   await setCache(url, snapshotUrl);
   return snapshotUrl;
+}
+
+// Check if a URL has an archived snapshot, using cache first.
+async function checkArchive(url) {
+  const cached = await getCached(url);
+  if (cached !== undefined) return cached;
+  return fetchAndCache(url);
 }
 
 async function getCached(url) {
@@ -246,6 +248,32 @@ async function setCache(url, snapshotUrl) {
   });
 }
 
+const CACHE_PREFIX = 'cache_';
+
+async function evictStaleCache() {
+  const all = await chrome.storage.local.get(null);
+  const now = Date.now();
+  const keysToRemove = [];
+  for (const [key, entry] of Object.entries(all)) {
+    if (!key.startsWith(CACHE_PREFIX)) continue;
+    if (!entry || typeof entry.timestamp !== 'number') {
+      keysToRemove.push(key);
+      continue;
+    }
+    const ttl = entry.snapshotUrl ? CACHE_TTL_MS : NEGATIVE_CACHE_TTL_MS;
+    if (now - entry.timestamp > ttl) {
+      keysToRemove.push(key);
+    }
+  }
+  if (keysToRemove.length > 0) {
+    await chrome.storage.local.remove(keysToRemove);
+  }
+  return keysToRemove.length;
+}
+
+// Run eviction on service worker startup
+evictStaleCache().catch(() => {});
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     cacheKey,
@@ -257,6 +285,8 @@ if (typeof module !== 'undefined' && module.exports) {
     parseTimemap,
     syncContentScriptRegistrations,
     injectIntoMatchingTabs,
+    evictStaleCache,
+    fetchAndCache,
     NEGATIVE_CACHE_TTL_MS,
   };
 }

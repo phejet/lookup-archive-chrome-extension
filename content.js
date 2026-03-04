@@ -2,13 +2,15 @@ const ARCHIVE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1
   <path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h11A1.5 1.5 0 0 1 15 2.5v1A1.5 1.5 0 0 1 13.5 5H13v8.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 3 13.5V5h-.5A1.5 1.5 0 0 1 1 3.5v-1zM2.5 2a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-11zM4 5v8.5a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V5H4zm3 2h2a.5.5 0 0 1 0 1H7a.5.5 0 0 1 0-1z"/>
 </svg>`;
 
-// Pre-parse the SVG into a reusable DocumentFragment
+// Pre-parse the SVG into a reusable template element.
+// Using a <template> avoids the DocumentFragment footgun (appending empties it)
+// and ensures the SVG is adopted into the HTML document context.
 const iconTemplate = (() => {
   const parser = new DOMParser();
   const doc = parser.parseFromString(ARCHIVE_ICON_SVG, 'image/svg+xml');
-  const fragment = document.createDocumentFragment();
-  fragment.appendChild(doc.documentElement);
-  return fragment;
+  const template = document.createElement('template');
+  template.content.appendChild(document.importNode(doc.documentElement, true));
+  return template;
 })();
 
 const checkedUrls = new Set();
@@ -65,7 +67,7 @@ function showStatus(text) {
 
 function scheduleFade(delayMs) {
   if (fadeTimeoutId) {
-    clearTimeout(fadeTimeoutId);
+    fadeTimeoutId.cancel();
   }
   // Use the Web Animations API delay instead of setTimeout,
   // since setTimeout can be throttled/killed in content scripts
@@ -152,13 +154,18 @@ function isInViewport(el) {
 
 // --- Link collection ---
 function collectNewLinks() {
-  const prefixes = [location.hostname];
+  const currentHost = location.hostname;
   const allLinks = document.querySelectorAll('a[href]:not(.archive-today-indicator)');
   const urlToElements = new Map();
 
   for (const link of allLinks) {
     const href = link.href;
-    if (!prefixes.some((prefix) => href.includes(prefix))) continue;
+    try {
+      const linkHost = new URL(href).hostname;
+      if (linkHost !== currentHost && !linkHost.endsWith('.' + currentHost)) continue;
+    } catch {
+      continue;
+    }
 
     if (!isInViewport(link)) continue;
     if (link.querySelector('img')) continue;
@@ -338,7 +345,7 @@ function injectIndicator(link, snapshotUrl) {
   indicator.title = snapshotDate
     ? `Archived ${formatRelativeTime(snapshotDate)}`
     : 'Open archived snapshot';
-  indicator.appendChild(iconTemplate.cloneNode(true));
+  indicator.appendChild(iconTemplate.content.cloneNode(true));
   indicator.addEventListener('click', (e) => {
     e.stopPropagation();
     e.preventDefault();

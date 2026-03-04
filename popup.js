@@ -16,6 +16,8 @@ function normalizeDomain(raw) {
   domain = domain.split(':')[0];
   // Strip www.
   domain = domain.replace(/^www\./, '');
+  // Reject domains with invalid characters (only allow alphanumeric, hyphens, dots)
+  if (!/^[a-z0-9.-]+$/.test(domain)) return '';
   return domain;
 }
 
