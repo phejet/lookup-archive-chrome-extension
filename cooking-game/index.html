@@ -1,0 +1,1733 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Roll With It! 🎂</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: #0d0502;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        font-family: Georgia, serif;
+        overflow: hidden;
+      }
+      canvas {
+        border-radius: 16px;
+        box-shadow:
+          0 0 80px rgba(220, 120, 40, 0.35),
+          0 0 160px rgba(150, 60, 10, 0.2);
+        cursor: crosshair;
+        display: block;
+        max-width: 100vw;
+        max-height: 100vh;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <script>
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  SETUP
+      // ─────────────────────────────────────────────────────────────────────────────
+      const canvas = document.getElementById("game");
+      const ctx = canvas.getContext("2d");
+      const W = (canvas.width = 900);
+      const H = (canvas.height = 580);
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  UTILITIES
+      // ─────────────────────────────────────────────────────────────────────────────
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+      const easeOut = (t) => 1 - (1 - t) ** 3;
+      const easeInOut = (t) => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t);
+      const rand = (a, b) => a + Math.random() * (b - a);
+      const PI2 = Math.PI * 2;
+
+      // Deterministic "noise" by seed — avoids per-frame flicker
+      function srand(seed) {
+        const x = Math.sin(seed * 127.1 + 831.3) * 43758.5453;
+        return x - Math.floor(x);
+      }
+      function srandRange(seed, lo, hi) {
+        return lo + srand(seed) * (hi - lo);
+      }
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  COLOUR PALETTE
+      // ─────────────────────────────────────────────────────────────────────────────
+      const C = {
+        sponge: "#F0D080",
+        sponge2: "#D4A84B",
+        spongeDark: "#A07830",
+        cream: "#FFF8F0",
+        cream2: "#EEE0C0",
+        berry1: "#C0284A",
+        berry2: "#8B2252",
+        berry3: "#F0608A",
+        nut: "#C49A3C",
+        nut2: "#8B6914",
+        text: "#FFF5E0",
+        accent: "#E8A020",
+        bg1: "#2C1810",
+        bg2: "#0D0502",
+      };
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  DRAW HELPERS
+      // ─────────────────────────────────────────────────────────────────────────────
+      function shadow(blur, color) {
+        ctx.shadowBlur = blur;
+        ctx.shadowColor = color;
+      }
+      function noShadow() {
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = "transparent";
+      }
+
+      function roundRect(x, y, w, h, r, fill, stroke, lineW = 2) {
+        r = Math.min(r, w / 2, h / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+        if (fill) {
+          ctx.fillStyle = fill;
+          ctx.fill();
+        }
+        if (stroke) {
+          ctx.strokeStyle = stroke;
+          ctx.lineWidth = lineW;
+          ctx.stroke();
+        }
+      }
+
+      function txt(str, x, y, size, color, align = "center") {
+        ctx.font = `${size}px Georgia`;
+        ctx.fillStyle = color;
+        ctx.textAlign = align;
+        ctx.fillText(str, x, y);
+      }
+
+      function gradRect(x, y, w, h, stops, vertical = true) {
+        const g = vertical
+          ? ctx.createLinearGradient(x, y, x, y + h)
+          : ctx.createLinearGradient(x, y, x + w, y);
+        stops.forEach(([t, c]) => g.addColorStop(t, c));
+        ctx.fillStyle = g;
+        ctx.fillRect(x, y, w, h);
+      }
+
+      function drawBackground(c1 = C.bg1, c2 = C.bg2) {
+        const g = ctx.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, c1);
+        g.addColorStop(1, c2);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      // Decorative swoosh lines in background
+      function drawSwooshes(color1, color2) {
+        for (let i = 0; i < 6; i++) {
+          ctx.strokeStyle = `rgba(200,120,30,${0.03 + i * 0.015})`;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(0, H * srandRange(i * 3, 0.3, 1.0));
+          ctx.bezierCurveTo(
+            W * 0.25,
+            H * srandRange(i * 3 + 1, 0.0, 0.5),
+            W * 0.75,
+            H * srandRange(i * 3 + 2, 0.5, 1.0),
+            W,
+            H * srandRange(i * 3, 0.0, 0.7),
+          );
+          ctx.stroke();
+        }
+      }
+
+      // Wooden cutting board surface
+      function drawWoodSurface(y) {
+        const g = ctx.createLinearGradient(0, y, 0, H);
+        g.addColorStop(0, "#9B6B42");
+        g.addColorStop(0.4, "#7A4E2C");
+        g.addColorStop(1, "#4A2E10");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, y, W, H - y);
+        // wood grain
+        for (let i = 0; i < 12; i++) {
+          ctx.strokeStyle = `rgba(0,0,0,${0.06 + srandRange(i * 5, 0, 0.06)})`;
+          ctx.lineWidth = srandRange(i * 5 + 1, 0.5, 2);
+          ctx.beginPath();
+          ctx.moveTo(0, y + srandRange(i * 5 + 2, 0, H - y));
+          ctx.bezierCurveTo(
+            W * 0.3,
+            y + srandRange(i * 5 + 3, 0, H - y),
+            W * 0.7,
+            y + srandRange(i * 5 + 4, 0, H - y),
+            W,
+            y + srandRange(i * 5 + 5, 0, H - y),
+          );
+          ctx.stroke();
+        }
+      }
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  CAKE DRAWING PRIMITIVES  (seeded — no flicker)
+      // ─────────────────────────────────────────────────────────────────────────────
+      const NUT_COUNT = 60;
+      const nutData = Array.from({ length: NUT_COUNT }, (_, i) => ({
+        a: srandRange(i * 7, 0, PI2),
+        dr: srandRange(i * 7 + 1, -5, 3),
+        w: srandRange(i * 7 + 2, 3, 7),
+        h: srandRange(i * 7 + 3, 2, 4),
+        rot: srandRange(i * 7 + 4, 0, Math.PI),
+        c: srandRange(i * 7 + 5, 0, 1) > 0.5,
+      }));
+
+      // Draw a roll-cake cross-section at (cx, cy) with semi-axes (rx, ry)
+      function drawCrossSection(cx, cy, rx, ry) {
+        // nut ring
+        ctx.fillStyle = C.nut;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, PI2);
+        ctx.fill();
+        // sponge ring
+        ctx.fillStyle = C.sponge;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx - 7, ry - 5, 0, 0, PI2);
+        ctx.fill();
+        // cream core
+        ctx.fillStyle = C.cream;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx - 18, ry - 14, 0, 0, PI2);
+        ctx.fill();
+        // berries
+        const bPos = [
+          [cx - 14, cy - 8],
+          [cx + 9, cy - 15],
+          [cx + 17, cy + 5],
+          [cx - 6, cy + 14],
+          [cx + 2, cy + 1],
+          [cx - 18, cy + 6],
+        ];
+        bPos.forEach(([bx, by]) => {
+          ctx.fillStyle = C.berry1;
+          ctx.beginPath();
+          ctx.ellipse(bx, by, 7, 6, 0, 0, PI2);
+          ctx.fill();
+          ctx.fillStyle = C.berry3;
+          ctx.beginPath();
+          ctx.ellipse(bx - 2, by - 2, 3, 2.5, 0, 0, PI2);
+          ctx.fill();
+        });
+        // nut texture ring
+        nutData.forEach((n) => {
+          const nx = cx + (rx - 7 + n.dr) * Math.cos(n.a) * 0.96;
+          const ny = cy + (ry - 4 + n.dr) * Math.sin(n.a) * 0.8;
+          ctx.fillStyle = n.c ? C.nut2 : "#D4A844";
+          ctx.save();
+          ctx.translate(nx, ny);
+          ctx.rotate(n.rot);
+          ctx.beginPath();
+          ctx.ellipse(0, 0, n.w, n.h, 0, 0, PI2);
+          ctx.fill();
+          ctx.restore();
+        });
+      }
+
+      // Full 3-D looking roll cake, centered at (cx, cy)
+      function drawRollCake(cx, cy, halfLen, ry) {
+        const rx = 52;
+        ctx.save();
+        // drop shadow
+        ctx.fillStyle = "rgba(0,0,0,0.25)";
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + ry + 10, halfLen * 0.9, 14, 0, 0, PI2);
+        ctx.fill();
+
+        // body gradient
+        const bg = ctx.createLinearGradient(cx, cy - ry, cx, cy + ry);
+        bg.addColorStop(0, "#DDB050");
+        bg.addColorStop(0.12, "#EAC868");
+        bg.addColorStop(0.5, "#C49030");
+        bg.addColorStop(0.88, "#A07820");
+        bg.addColorStop(1, "#7A5A10");
+        ctx.fillStyle = bg;
+        ctx.beginPath();
+        ctx.ellipse(
+          cx - halfLen,
+          cy,
+          14,
+          ry,
+          0,
+          Math.PI / 2,
+          (Math.PI * 3) / 2,
+        );
+        ctx.rect(cx - halfLen, cy - ry, halfLen * 2, ry * 2);
+        ctx.ellipse(cx + halfLen, cy, 14, ry, 0, 0, PI2);
+        ctx.fill();
+
+        // top nut scatter (seeded)
+        const TOP_NUTS = 55;
+        for (let i = 0; i < TOP_NUTS; i++) {
+          const px =
+            cx - halfLen + 10 + srandRange(i * 9, 0, 1) * (halfLen * 2 - 20);
+          const py = cy - ry + 3 + srandRange(i * 9 + 1, 0, 1) * 10;
+          ctx.fillStyle =
+            srandRange(i * 9 + 2, 0, 1) > 0.5 ? C.nut2 : "#D4A844";
+          ctx.save();
+          ctx.translate(px, py);
+          ctx.rotate(srandRange(i * 9 + 3, 0, Math.PI));
+          ctx.beginPath();
+          ctx.ellipse(
+            0,
+            0,
+            srandRange(i * 9 + 4, 3, 7),
+            srandRange(i * 9 + 5, 2, 4),
+            0,
+            0,
+            PI2,
+          );
+          ctx.fill();
+          ctx.restore();
+        }
+        // left cross-section
+        drawCrossSection(cx - halfLen, cy, rx, ry);
+        // right end cap
+        ctx.fillStyle = bg;
+        ctx.beginPath();
+        ctx.ellipse(cx + halfLen, cy, 14, ry, 0, 0, PI2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  PROGRESS BAR
+      // ─────────────────────────────────────────────────────────────────────────────
+      function drawProgress(val, label) {
+        const pw = 420,
+          ph = 26,
+          px = (W - pw) / 2,
+          py = H - 52;
+        roundRect(px, py, pw, ph, ph / 2, "rgba(0,0,0,0.45)");
+        if (val > 0) {
+          const g = ctx.createLinearGradient(px, 0, px + pw, 0);
+          g.addColorStop(0, "#D06010");
+          g.addColorStop(1, "#FFD040");
+          roundRect(px, py, Math.max(ph, val * pw), ph, ph / 2, g);
+        }
+        txt(label, W / 2, py - 8, 15, "rgba(255,240,200,0.85)");
+        txt(
+          `${Math.round(val * 100)}%`,
+          W / 2,
+          py + ph / 2 + 6,
+          14,
+          "rgba(255,255,255,0.9)",
+        );
+      }
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  TEMPERATURE GAUGE  (Step 2)
+      // ─────────────────────────────────────────────────────────────────────────────
+      function drawTempGauge(temp, lo, hi) {
+        const gx = 60,
+          gy = 140,
+          gw = 28,
+          gh = 280;
+        roundRect(gx, gy, gw, gh, gw / 2, "rgba(0,0,0,0.5)");
+        // green zone
+        roundRect(
+          gx,
+          gy + (1 - hi) * gh,
+          gw,
+          (hi - lo) * gh,
+          4,
+          "rgba(60,220,60,0.35)",
+        );
+        // fill
+        const fh = temp * gh;
+        const tc = temp > hi ? "#F04040" : temp < lo ? "#4080FF" : "#50E050";
+        const g = ctx.createLinearGradient(0, gy + gh, 0, gy + gh - fh);
+        g.addColorStop(0, tc);
+        g.addColorStop(1, "rgba(255,210,30,0.8)");
+        roundRect(gx, gy + gh - fh, gw, fh, gw / 2, g);
+        txt("TEMP", gx + gw / 2, gy - 10, 13, C.text);
+        txt("🔥", gx + gw + 10, gy + 14, 14, "#F07070", "left");
+        txt(
+          "✓",
+          gx + gw + 10,
+          gy + (1 - hi) * gh + ((hi - lo) * gh) / 2 + 5,
+          16,
+          "#70F070",
+          "left",
+        );
+        txt("❄", gx + gw + 10, gy + gh - 10, 14, "#80A0FF", "left");
+      }
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  STAR DRAWING
+      // ─────────────────────────────────────────────────────────────────────────────
+      function drawStars(score, cx, cy) {
+        const stars = score >= 90 ? 3 : score >= 65 ? 2 : 1;
+        for (let i = 0; i < 3; i++) {
+          const sx = cx - 60 + i * 60;
+          ctx.save();
+          ctx.translate(sx, cy);
+          if (i < stars) shadow(18, "#FFD040");
+          ctx.fillStyle = i < stars ? "#FFD040" : "rgba(255,255,255,0.15)";
+          ctx.beginPath();
+          for (let p = 0; p < 10; p++) {
+            const a = (p * Math.PI) / 5 - Math.PI / 2;
+            const r = p % 2 === 0 ? 22 : 9;
+            p === 0
+              ? ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r)
+              : ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+          }
+          ctx.closePath();
+          ctx.fill();
+          noShadow();
+          ctx.restore();
+        }
+        return stars;
+      }
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  STEP HEADER / HINT
+      // ─────────────────────────────────────────────────────────────────────────────
+      function drawStepHeader(title, hint, stepIdx) {
+        // top pill
+        roundRect(W / 2 - 230, 6, 460, 36, 18, "rgba(0,0,0,0.55)");
+        txt(`Step ${stepIdx + 1}/7 — ${title}`, W / 2, 30, 17, C.accent);
+        // hint pill
+        roundRect(W / 2 - 260, H - 88, 520, 28, 14, "rgba(0,0,0,0.45)");
+        txt(hint, W / 2, H - 68, 14, "rgba(255,240,200,0.9)");
+        // small step dots
+        for (let i = 0; i < 7; i++) {
+          const dx = W / 2 - 3 * 22 + i * 22,
+            dy = 50;
+          ctx.fillStyle =
+            i < stepIdx
+              ? "#FFD040"
+              : i === stepIdx
+                ? "#FF8040"
+                : "rgba(255,255,255,0.2)";
+          ctx.beginPath();
+          ctx.arc(dx, dy, 7, 0, PI2);
+          ctx.fill();
+        }
+      }
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  STEP 1 — MIX THE BATTER
+      // ─────────────────────────────────────────────────────────────────────────────
+      const step1 = (() => {
+        let mixLevel = 0,
+          whiskAngle = 0,
+          particles = [];
+        return {
+          title: "Mix the Batter",
+          hint: "Click and hold rapidly to beat the eggs & flour!",
+          complete: false,
+          score: 0,
+          init() {
+            mixLevel = 0;
+            whiskAngle = 0;
+            particles = [];
+            this.complete = false;
+            this.score = 0;
+          },
+          update() {
+            whiskAngle += mouse.down ? 0.28 : 0.04;
+            if (mouse.down) mixLevel = clamp(mixLevel + 0.018, 0, 1);
+            else mixLevel = clamp(mixLevel - 0.003, 0, 1);
+            particles = particles.filter((p) => p.life > 0);
+            particles.forEach((p) => {
+              p.x += p.vx;
+              p.y += p.vy;
+              p.vy += 0.25;
+              p.vx *= 0.96;
+              p.life -= 2;
+            });
+            if (mixLevel >= 1 && !this.complete) {
+              this.complete = true;
+              this.score = 85 + Math.round(Math.random() * 15);
+            }
+          },
+          click() {
+            for (let i = 0; i < 7; i++)
+              particles.push({
+                x: 450,
+                y: 340,
+                vx: rand(-7, 7),
+                vy: rand(-9, -2),
+                life: 55,
+                color:
+                  i % 3 === 0 ? C.sponge : i % 3 === 1 ? C.cream : "#F0E080",
+              });
+          },
+          draw() {
+            drawBackground("#3D2010", "#160804");
+            drawSwooshes();
+            drawWoodSurface(430);
+
+            // Bowl body (bezier silhouette)
+            shadow(20, "rgba(0,0,0,0.5)");
+            const bg2 = ctx.createLinearGradient(0, 300, 0, 440);
+            bg2.addColorStop(0, "#EEE0C8");
+            bg2.addColorStop(1, "#D8C8A8");
+            ctx.fillStyle = bg2;
+            ctx.beginPath();
+            ctx.moveTo(295, 438);
+            ctx.bezierCurveTo(270, 438, 252, 390, 285, 335);
+            ctx.bezierCurveTo(330, 290, 570, 290, 615, 335);
+            ctx.bezierCurveTo(648, 390, 630, 438, 605, 438);
+            ctx.bezierCurveTo(540, 458, 360, 458, 295, 438);
+            ctx.closePath();
+            ctx.fill();
+            noShadow();
+
+            // Bowl rim (ellipse)
+            ctx.fillStyle = "#F4ECD8";
+            ctx.beginPath();
+            ctx.ellipse(450, 302, 162, 24, 0, 0, PI2);
+            ctx.fill();
+            ctx.strokeStyle = "#D0C0A0";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.ellipse(450, 302, 162, 24, 0, 0, PI2);
+            ctx.stroke();
+
+            // Batter inside
+            if (mixLevel > 0) {
+              const by = lerp(435, 318, mixLevel);
+              const batg = ctx.createLinearGradient(0, by, 0, 435);
+              batg.addColorStop(0, "#F5D870");
+              batg.addColorStop(1, "#C89030");
+              ctx.fillStyle = batg;
+              ctx.beginPath();
+              ctx.moveTo(300, 435);
+              ctx.bezierCurveTo(275, 435, 262, 400, 294, by + 10);
+              ctx.bezierCurveTo(336, by - 6, 564, by - 6, 606, by + 10);
+              ctx.bezierCurveTo(638, 400, 625, 435, 600, 435);
+              ctx.bezierCurveTo(540, 452, 360, 452, 300, 435);
+              ctx.closePath();
+              ctx.fill();
+              // Swirl lines on batter
+              ctx.strokeStyle = "rgba(220,170,40,0.5)";
+              ctx.lineWidth = 2;
+              for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                ctx.ellipse(
+                  450,
+                  by + 20 + i * 18,
+                  80 - i * 20,
+                  8 - i * 2,
+                  0,
+                  0,
+                  PI2,
+                );
+                ctx.stroke();
+              }
+            }
+
+            // Whisk
+            ctx.save();
+            ctx.translate(450, 285 + Math.sin(whiskAngle) * 14);
+            ctx.rotate(Math.sin(whiskAngle * 2.1) * 0.5);
+            // handle
+            ctx.strokeStyle = "#999";
+            ctx.lineWidth = 9;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(0, -90);
+            ctx.lineTo(0, 0);
+            ctx.stroke();
+            ctx.strokeStyle = "#BBB";
+            ctx.lineWidth = 2.5;
+            for (let i = 0; i < 4; i++) {
+              const a = (i / 4) * Math.PI;
+              ctx.beginPath();
+              ctx.moveTo(0, 0);
+              ctx.bezierCurveTo(
+                Math.cos(a) * 28,
+                22,
+                Math.cos(a) * 22,
+                52,
+                0,
+                62,
+              );
+              ctx.stroke();
+              ctx.beginPath();
+              ctx.moveTo(0, 0);
+              ctx.bezierCurveTo(
+                -Math.cos(a) * 28,
+                22,
+                -Math.cos(a) * 22,
+                52,
+                0,
+                62,
+              );
+              ctx.stroke();
+            }
+            ctx.restore();
+
+            // Splash particles
+            particles.forEach((p) => {
+              ctx.globalAlpha = p.life / 55;
+              ctx.fillStyle = p.color;
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, 5, 0, PI2);
+              ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+
+            drawProgress(mixLevel, "Mix Level");
+            drawStepHeader(this.title, this.hint, 0);
+          },
+        };
+      })();
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  STEP 2 — BAKE THE SPONGE
+      // ─────────────────────────────────────────────────────────────────────────────
+      const step2 = (() => {
+        let temp = 0.25,
+          bake = 0;
+        const LO = 0.52,
+          HI = 0.72;
+        let smoke = [];
+        return {
+          title: "Bake the Sponge",
+          hint: "Hold click to heat — keep temperature in the green zone!",
+          complete: false,
+          score: 0,
+          init() {
+            temp = 0.25;
+            bake = 0;
+            smoke = [];
+            this.complete = false;
+            this.score = 0;
+          },
+          update() {
+            temp = clamp(temp + (mouse.down ? 0.009 : -0.006), 0, 1);
+            const inZone = temp >= LO && temp <= HI;
+            if (inZone) bake = clamp(bake + 0.004, 0, 1);
+            else if (temp > HI) bake = clamp(bake - 0.002, 0, 1);
+            if (temp > 0.78 && Math.random() < 0.12)
+              smoke.push({
+                x: rand(330, 570),
+                y: 220,
+                vx: rand(-0.8, 0.8),
+                vy: -rand(1, 2.5),
+                life: 90,
+                r: rand(10, 22),
+              });
+            smoke = smoke.filter((p) => p.life > 0);
+            smoke.forEach((p) => {
+              p.x += p.vx;
+              p.y += p.vy;
+              p.r += 0.18;
+              p.life -= 1.4;
+            });
+            if (bake >= 1 && !this.complete) {
+              this.complete = true;
+              this.score = clamp(
+                Math.round(100 - (Math.abs(temp - (LO + HI) / 2) / 0.5) * 30),
+                55,
+                100,
+              );
+            }
+          },
+          click() {},
+          draw() {
+            drawBackground("#200E06", "#0A0402");
+            drawSwooshes();
+
+            // Oven glow on wall
+            const glow = ctx.createRadialGradient(450, 310, 0, 450, 310, 280);
+            glow.addColorStop(
+              0,
+              `rgba(255,${Math.floor(60 + temp * 80)},0,${temp * 0.3})`,
+            );
+            glow.addColorStop(1, "transparent");
+            ctx.fillStyle = glow;
+            ctx.fillRect(0, 0, W, H);
+
+            // Oven body
+            shadow(
+              25,
+              `rgba(255,${Math.floor(80 + temp * 120)},0,${0.3 + temp * 0.3})`,
+            );
+            roundRect(170, 130, 560, 360, 22, "#4A4A4A");
+            noShadow();
+            roundRect(180, 140, 540, 340, 16, "#383838");
+
+            // Heating coils
+            const coilColor = `rgb(${Math.floor(temp * 255)},${Math.floor(temp * 60)},0)`;
+            ctx.strokeStyle = coilColor;
+            ctx.lineWidth = 7;
+            ctx.lineCap = "round";
+            for (let i = 0; i < 3; i++) {
+              ctx.beginPath();
+              ctx.moveTo(210, 195 + i * 48);
+              ctx.bezierCurveTo(
+                340,
+                188 + i * 48,
+                560,
+                202 + i * 48,
+                690,
+                195 + i * 48,
+              );
+              ctx.stroke();
+            }
+
+            // Cake pan
+            shadow(10, "rgba(0,0,0,0.6)");
+            roundRect(280, 320, 340, 65, 8, "#8A8A8A");
+            noShadow();
+
+            // Sponge inside pan
+            const browning = bake;
+            const sc = `rgb(${Math.floor(215 + browning * 40)},${Math.floor(185 - browning * 75)},${Math.floor(95 - browning * 55)})`;
+            const rise = browning * 28;
+            const sg = ctx.createLinearGradient(0, 295 - rise, 0, 360);
+            sg.addColorStop(0, sc);
+            sg.addColorStop(1, C.spongeDark);
+            roundRect(290, 295 - rise, 320, 60 + rise, 6, sg);
+
+            // Steam wisps
+            smoke.forEach((p) => {
+              ctx.globalAlpha = (p.life / 90) * 0.5;
+              ctx.fillStyle = "#DDD";
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, p.r, 0, PI2);
+              ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+
+            // Oven door glass overlay
+            ctx.fillStyle = "rgba(0,20,40,0.18)";
+            roundRect(185, 145, 530, 320, 14, "rgba(0,20,40,0.18)");
+
+            drawTempGauge(temp, LO, HI);
+            drawProgress(bake, "Baking Progress");
+            drawStepHeader(this.title, this.hint, 1);
+          },
+        };
+      })();
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  STEP 3 — SPREAD THE CREAM
+      // ─────────────────────────────────────────────────────────────────────────────
+      const step3 = (() => {
+        let coverage = new Float32Array(40);
+        return {
+          title: "Spread the Cream",
+          hint: "Drag across the sponge to spread the cream!",
+          complete: false,
+          score: 0,
+          init() {
+            coverage = new Float32Array(40);
+            this.complete = false;
+            this.score = 0;
+          },
+          update() {
+            if (mouse.down) {
+              const mx = mouse.x,
+                my = mouse.y;
+              if (my > 235 && my < 370 && mx > 130 && mx < 770) {
+                const cell = Math.floor(((mx - 130) / 640) * 40);
+                if (cell >= 0 && cell < 40) {
+                  coverage[cell] = clamp(coverage[cell] + 0.18, 0, 1);
+                  if (cell > 0)
+                    coverage[cell - 1] = clamp(coverage[cell - 1] + 0.06, 0, 1);
+                  if (cell < 39)
+                    coverage[cell + 1] = clamp(coverage[cell + 1] + 0.06, 0, 1);
+                }
+              }
+            }
+            const covered = coverage.reduce((s, v) => s + v, 0) / 40;
+            if (covered >= 0.85 && !this.complete) {
+              this.complete = true;
+              this.score = Math.round(clamp(covered * 38 + 62, 60, 100));
+            }
+          },
+          click() {},
+          draw() {
+            drawBackground("#3A2010", "#160804");
+            drawSwooshes();
+            drawWoodSurface(400);
+
+            // Flat sponge
+            shadow(14, "rgba(0,0,0,0.4)");
+            const sg = ctx.createLinearGradient(0, 238, 0, 372);
+            sg.addColorStop(0, "#F5DC88");
+            sg.addColorStop(1, "#C89038");
+            roundRect(130, 238, 640, 134, 10, sg);
+            noShadow();
+
+            // Sponge texture grain
+            ctx.strokeStyle = "rgba(160,110,30,0.25)";
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 9; i++) {
+              ctx.beginPath();
+              ctx.moveTo(130, 246 + i * 14);
+              ctx.bezierCurveTo(
+                340,
+                242 + i * 14,
+                560,
+                250 + i * 14,
+                770,
+                246 + i * 14,
+              );
+              ctx.stroke();
+            }
+
+            // Cream painted cells
+            const cellW = 640 / 40;
+            for (let i = 0; i < 40; i++) {
+              if (coverage[i] > 0) {
+                ctx.globalAlpha = coverage[i] * 0.92;
+                const cg = ctx.createLinearGradient(0, 242, 0, 368);
+                cg.addColorStop(0, C.cream);
+                cg.addColorStop(1, C.cream2);
+                ctx.fillStyle = cg;
+                ctx.fillRect(130 + i * cellW, 242, cellW + 1, 128);
+              }
+            }
+            ctx.globalAlpha = 1;
+
+            // Cream blob on cursor
+            if (mouse.down) {
+              const mx = clamp(mouse.x, 130, 770),
+                my = clamp(mouse.y, 235, 370);
+              ctx.fillStyle = C.cream;
+              ctx.beginPath();
+              ctx.ellipse(mx, my, 22, 14, 0, 0, PI2);
+              ctx.fill();
+            }
+
+            // Spatula
+            ctx.save();
+            ctx.translate(mouse.x, clamp(mouse.y, 200, 390));
+            ctx.rotate(0.45);
+            roundRect(-4, -55, 8, 72, 4, "#B09050"); // handle
+            roundRect(-13, 17, 26, 34, 3, "#E8E0D0"); // blade
+            ctx.restore();
+
+            const covered = coverage.reduce((s, v) => s + v, 0) / 40;
+            drawProgress(covered, "Cream Coverage");
+            drawStepHeader(this.title, this.hint, 2);
+          },
+        };
+      })();
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  STEP 4 — DROP THE BERRIES
+      // ─────────────────────────────────────────────────────────────────────────────
+      const step4 = (() => {
+        const NEEDED = 12;
+        let berries = [];
+        return {
+          title: "Drop the Berries",
+          hint: `Click on the cream to place ${NEEDED} berries!`,
+          complete: false,
+          score: 0,
+          init() {
+            berries = [];
+            this.complete = false;
+            this.score = 0;
+          },
+          update() {
+            berries.forEach((b) => {
+              b.scale = clamp(b.scale + 0.12, 0, 1);
+            });
+            if (berries.length >= NEEDED && !this.complete) {
+              this.complete = true;
+              // score by spread evenness
+              const bins = new Array(8).fill(0);
+              berries.forEach((b) => {
+                const i = clamp(Math.floor((b.x - 130) / 80), 0, 7);
+                bins[i]++;
+              });
+              const evenness =
+                1 -
+                bins.reduce((s, v) => s + Math.abs(v - NEEDED / 8), 0) / NEEDED;
+              this.score = Math.round(clamp(evenness * 35 + 65, 65, 100));
+            }
+          },
+          click(x, y) {
+            if (
+              y > 244 &&
+              y < 368 &&
+              x > 140 &&
+              x < 760 &&
+              berries.length < NEEDED * 1.5
+            ) {
+              berries.push({
+                x,
+                y: clamp(y, 260, 350),
+                scale: 0,
+                type: Math.floor(Math.random() * 3),
+              });
+            }
+          },
+          draw() {
+            drawBackground("#3A2010", "#160804");
+            drawSwooshes();
+            drawWoodSurface(400);
+
+            // Sponge
+            shadow(14, "rgba(0,0,0,0.4)");
+            roundRect(130, 238, 640, 134, 10, C.sponge);
+            noShadow();
+            // Cream layer
+            roundRect(132, 242, 636, 128, 8, C.cream);
+
+            // Berries
+            berries.forEach((b) => {
+              ctx.save();
+              ctx.translate(b.x, b.y);
+              ctx.scale(b.scale, b.scale);
+              shadow(8, "rgba(0,0,0,0.4)");
+              ctx.fillStyle = C.berry1;
+              ctx.beginPath();
+              ctx.ellipse(0, 0, 11, 10, 0, 0, PI2);
+              ctx.fill();
+              noShadow();
+              ctx.fillStyle = C.berry2;
+              ctx.beginPath();
+              ctx.arc(0, 0, 7, 0, PI2);
+              ctx.fill();
+              ctx.fillStyle = C.berry3;
+              ctx.beginPath();
+              ctx.ellipse(-3, -3, 4, 3, 0, 0, PI2);
+              ctx.fill();
+              // tiny stem
+              ctx.strokeStyle = "#3A7030";
+              ctx.lineWidth = 1.8;
+              ctx.lineCap = "round";
+              ctx.beginPath();
+              ctx.moveTo(0, -10);
+              ctx.quadraticCurveTo(4, -18, 2, -23);
+              ctx.stroke();
+              ctx.restore();
+            });
+
+            txt(
+              `${berries.length} / ${NEEDED} berries placed`,
+              W / 2,
+              430,
+              20,
+              C.accent,
+            );
+            drawProgress(berries.length / NEEDED, "Berries Placed");
+            drawStepHeader(this.title, this.hint, 3);
+          },
+        };
+      })();
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  STEP 5 — ROLL IT UP
+      // ─────────────────────────────────────────────────────────────────────────────
+      const step5 = (() => {
+        let rollP = 0,
+          particles = [];
+        return {
+          title: "Roll It Up!",
+          hint: "Drag from left to right to roll the cake!",
+          complete: false,
+          score: 0,
+          init() {
+            rollP = 0;
+            particles = [];
+            this.complete = false;
+            this.score = 0;
+          },
+          update() {
+            if (mouse.down) {
+              const target = clamp((mouse.x - 130) / 640, 0, 1);
+              if (target > rollP) {
+                rollP = clamp(rollP + 0.012, 0, target);
+                for (let i = 0; i < 3; i++)
+                  particles.push({
+                    x: 130 + rollP * 640,
+                    y: rand(250, 360),
+                    vx: rand(-2, 2),
+                    vy: rand(-5, -1),
+                    life: 45,
+                    color: rand(0, 1) > 0.5 ? C.cream : C.sponge,
+                  });
+              }
+            }
+            particles = particles.filter((p) => p.life > 0);
+            particles.forEach((p) => {
+              p.x += p.vx;
+              p.y += p.vy;
+              p.vy += 0.3;
+              p.life -= 3;
+            });
+            if (rollP >= 0.96 && !this.complete) {
+              this.complete = true;
+              this.score = 92;
+            }
+          },
+          click() {},
+          draw() {
+            drawBackground("#3A2010", "#160804");
+            drawSwooshes();
+            drawWoodSurface(400);
+
+            const rollX = 130 + rollP * 640;
+            const ry = 20 + rollP * 40;
+            const len = rollP * 640 * 0.38;
+            const cy = 305;
+
+            // Flat tail still unrolled
+            if (rollP < 1) {
+              shadow(8, "rgba(0,0,0,0.3)");
+              roundRect(rollX, 238, 770 - rollX, 134, 6, C.sponge);
+              noShadow();
+              roundRect(rollX + 2, 242, 768 - rollX, 128, 5, C.cream);
+              // berries on flat
+              [0.08, 0.22, 0.38, 0.53, 0.68, 0.83].forEach((bp, i) => {
+                const bpx = rollX + bp * (770 - rollX);
+                if (bpx < 765) {
+                  ctx.fillStyle = C.berry1;
+                  ctx.beginPath();
+                  ctx.arc(bpx, 268 + (i % 3) * 22, 8, 0, PI2);
+                  ctx.fill();
+                }
+              });
+            }
+
+            // Rolled cylinder
+            if (rollP > 0.02) {
+              shadow(18, "rgba(0,0,0,0.5)");
+              // ground shadow
+              ctx.fillStyle = "rgba(0,0,0,0.25)";
+              ctx.beginPath();
+              ctx.ellipse(rollX - len / 2, cy + ry + 6, len / 2, 10, 0, 0, PI2);
+              ctx.fill();
+              noShadow();
+
+              const bg2 = ctx.createLinearGradient(0, cy - ry, 0, cy + ry);
+              bg2.addColorStop(0, C.sponge2);
+              bg2.addColorStop(0.5, C.sponge);
+              bg2.addColorStop(1, C.nut2);
+              ctx.fillStyle = bg2;
+              ctx.beginPath();
+              ctx.ellipse(
+                rollX - len,
+                cy,
+                13,
+                ry,
+                0,
+                Math.PI / 2,
+                (Math.PI * 3) / 2,
+              );
+              ctx.rect(rollX - len, cy - ry, len, ry * 2);
+              ctx.lineTo(rollX, cy - ry);
+              ctx.lineTo(rollX, cy + ry);
+              ctx.closePath();
+              ctx.fill();
+
+              // cross-section on left end
+              ctx.fillStyle = C.sponge;
+              ctx.beginPath();
+              ctx.ellipse(rollX - len, cy, 13, ry, 0, 0, PI2);
+              ctx.fill();
+              ctx.fillStyle = C.cream;
+              ctx.beginPath();
+              ctx.ellipse(rollX - len, cy, 7, ry - 9, 0, 0, PI2);
+              ctx.fill();
+            }
+
+            // Particles
+            particles.forEach((p) => {
+              ctx.globalAlpha = p.life / 45;
+              ctx.fillStyle = p.color;
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, 4, 0, PI2);
+              ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+
+            drawProgress(rollP, "Rolling Progress");
+            drawStepHeader(this.title, this.hint, 4);
+          },
+        };
+      })();
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  STEP 6 — COAT WITH NUTS
+      // ─────────────────────────────────────────────────────────────────────────────
+      const step6 = (() => {
+        let nuts = [],
+          coverage = 0;
+        return {
+          title: "Coat with Nuts",
+          hint: "Click rapidly to shake crushed nuts all over the roll!",
+          complete: false,
+          score: 0,
+          init() {
+            nuts = [];
+            coverage = 0;
+            this.complete = false;
+            this.score = 0;
+          },
+          update() {
+            if (mouse.down) {
+              for (let i = 0; i < 4; i++)
+                nuts.push({
+                  x: rand(180, 720),
+                  y: rand(-15, 20),
+                  vy: rand(3, 7),
+                  vx: rand(-1.2, 1.2),
+                  rot: rand(0, PI2),
+                  w: rand(3, 8),
+                  h: rand(2, 4.5),
+                  stuck: false,
+                });
+            }
+            nuts = nuts.filter((n) => n.y < 430);
+            nuts.forEach((n) => {
+              if (n.stuck) return;
+              n.x += n.vx;
+              n.y += n.vy;
+              n.vy += 0.35;
+              n.rot += 0.08;
+              // Stick when hitting roll surface
+              const dx = (n.x - 450) / 230,
+                dy = (n.y - 298) / 58;
+              if (dx * dx + dy * dy <= 1.05) n.stuck = true;
+            });
+            coverage = clamp(nuts.filter((n) => n.stuck).length / 130, 0, 1);
+            if (coverage >= 0.88 && !this.complete) {
+              this.complete = true;
+              this.score = Math.round(coverage * 25 + 75);
+            }
+          },
+          click() {
+            for (let i = 0; i < 10; i++)
+              nuts.push({
+                x: rand(180, 720),
+                y: rand(-15, 20),
+                vy: rand(3, 7),
+                vx: rand(-1.5, 1.5),
+                rot: rand(0, PI2),
+                w: rand(3, 8),
+                h: rand(2, 4.5),
+                stuck: false,
+              });
+          },
+          draw() {
+            drawBackground("#1E0C04", "#0A0402");
+            drawSwooshes();
+            drawWoodSurface(410);
+
+            // Drop shadow
+            ctx.fillStyle = "rgba(0,0,0,0.3)";
+            ctx.beginPath();
+            ctx.ellipse(450, 362, 228, 16, 0, 0, PI2);
+            ctx.fill();
+
+            // Roll body
+            const bg2 = ctx.createLinearGradient(0, 240, 0, 356);
+            bg2.addColorStop(0, C.nut);
+            bg2.addColorStop(0.4, C.sponge2);
+            bg2.addColorStop(1, C.nut2);
+            ctx.fillStyle = bg2;
+            ctx.beginPath();
+            ctx.ellipse(220, 298, 14, 58, 0, Math.PI / 2, (Math.PI * 3) / 2);
+            ctx.rect(220, 240, 460, 116);
+            ctx.ellipse(680, 298, 14, 58, 0, 0, PI2);
+            ctx.fill();
+
+            // Stuck nuts
+            nuts
+              .filter((n) => n.stuck)
+              .forEach((n) => {
+                ctx.save();
+                ctx.translate(n.x, n.y);
+                ctx.rotate(n.rot);
+                ctx.fillStyle = Math.random() > 0.5 ? C.nut : C.nut2;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, n.w, n.h, 0, 0, PI2);
+                ctx.fill();
+                ctx.restore();
+              });
+
+            // Flying nuts
+            nuts
+              .filter((n) => !n.stuck)
+              .forEach((n) => {
+                ctx.save();
+                ctx.translate(n.x, n.y);
+                ctx.rotate(n.rot);
+                ctx.fillStyle = C.nut;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, n.w, n.h * 0.7, 0, 0, PI2);
+                ctx.fill();
+                ctx.restore();
+              });
+
+            // Cross-section face
+            ctx.fillStyle = C.sponge;
+            ctx.beginPath();
+            ctx.ellipse(220, 298, 14, 58, 0, 0, PI2);
+            ctx.fill();
+            ctx.fillStyle = C.cream;
+            ctx.beginPath();
+            ctx.ellipse(220, 298, 8, 40, 0, 0, PI2);
+            ctx.fill();
+            [
+              [220, 280],
+              [220, 298],
+              [220, 316],
+            ].forEach(([bx, by]) => {
+              ctx.fillStyle = C.berry1;
+              ctx.beginPath();
+              ctx.arc(bx, by, 5, 0, PI2);
+              ctx.fill();
+            });
+
+            drawProgress(coverage, "Nut Coverage");
+            drawStepHeader(this.title, this.hint, 5);
+          },
+        };
+      })();
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  STEP 7 — SLICE & SERVE
+      // ─────────────────────────────────────────────────────────────────────────────
+      const step7 = (() => {
+        let knifeY = 80,
+          sliceP = 0,
+          sliced = false,
+          revealP = 0;
+        return {
+          title: "Slice & Serve!",
+          hint: "Drag the knife down to cut a perfect slice!",
+          complete: false,
+          score: 0,
+          init() {
+            knifeY = 80;
+            sliceP = 0;
+            sliced = false;
+            revealP = 0;
+            this.complete = false;
+            this.score = 0;
+          },
+          update() {
+            if (mouse.down && !sliced) {
+              knifeY = clamp(mouse.y, 80, 500);
+              sliceP = clamp((knifeY - 80) / 320, 0, 1);
+              if (sliceP >= 1) sliced = true;
+            }
+            if (sliced) revealP = clamp(revealP + 0.022, 0, 1);
+            if (revealP >= 1 && !this.complete) {
+              this.complete = true;
+              this.score = 95;
+            }
+          },
+          click() {},
+          draw() {
+            drawBackground("#1E0C04", "#0A0402");
+            drawSwooshes();
+            drawWoodSurface(410);
+
+            const SLICE_X = 460,
+              CY = 298;
+
+            // Main roll (partially hidden behind slice when revealed)
+            if (revealP < 1) {
+              ctx.fillStyle = "rgba(0,0,0,0.25)";
+              ctx.beginPath();
+              ctx.ellipse(450, 362, 228, 16, 0, 0, PI2);
+              ctx.fill();
+
+              const bg2 = ctx.createLinearGradient(0, 242, 0, 356);
+              bg2.addColorStop(0, C.nut);
+              bg2.addColorStop(0.4, C.sponge2);
+              bg2.addColorStop(1, C.nut2);
+              ctx.fillStyle = bg2;
+              ctx.beginPath();
+              ctx.ellipse(220, CY, 14, 58, 0, Math.PI / 2, (Math.PI * 3) / 2);
+              ctx.rect(220, 240, 460, 116);
+              ctx.ellipse(680, CY, 14, 58, 0, 0, PI2);
+              ctx.fill();
+
+              // Top nut scatter
+              for (let i = 0; i < 44; i++) {
+                ctx.fillStyle = i % 2 ? C.nut : C.nut2;
+                ctx.save();
+                ctx.translate(
+                  220 + srandRange(i * 11, 0, 460),
+                  242 + srandRange(i * 11 + 1, 0, 8),
+                );
+                ctx.rotate(srandRange(i * 11 + 2, 0, Math.PI));
+                ctx.beginPath();
+                ctx.ellipse(
+                  0,
+                  0,
+                  srandRange(i * 11 + 3, 3, 7),
+                  srandRange(i * 11 + 4, 2, 4),
+                  0,
+                  0,
+                  PI2,
+                );
+                ctx.fill();
+                ctx.restore();
+              }
+            }
+
+            // Slice reveal
+            if (revealP > 0) {
+              const rev = easeOut(revealP);
+              const sw = 54;
+              const sliceDrawX = lerp(SLICE_X, SLICE_X - 190, rev);
+              const tilt = lerp(0, -0.18, rev);
+
+              ctx.save();
+              ctx.translate(sliceDrawX, CY);
+              ctx.rotate(tilt);
+              shadow(20, "rgba(0,0,0,0.5)");
+
+              // Nut exterior
+              ctx.fillStyle = C.nut;
+              ctx.beginPath();
+              ctx.ellipse(0, 0, sw / 2, 58, 0, 0, PI2);
+              ctx.fill();
+              noShadow();
+
+              // Sponge ring
+              ctx.fillStyle = C.sponge;
+              ctx.beginPath();
+              ctx.ellipse(
+                -sw / 2,
+                0,
+                14,
+                58,
+                0,
+                Math.PI / 2,
+                (Math.PI * 3) / 2,
+              );
+              ctx.fill();
+
+              // Cream interior
+              ctx.fillStyle = C.cream;
+              ctx.beginPath();
+              ctx.ellipse(-sw / 2, 0, 9, 44, 0, Math.PI / 2, (Math.PI * 3) / 2);
+              ctx.fill();
+
+              // Berries in cross-section
+              [[-14], [-2], [12], [-8], [6], [-20], [18], [0]].forEach(
+                ([by]) => {
+                  ctx.fillStyle = C.berry1;
+                  ctx.beginPath();
+                  ctx.ellipse(-sw / 2 + 2, by, 5, 6, 0, 0, PI2);
+                  ctx.fill();
+                  ctx.fillStyle = C.berry3;
+                  ctx.beginPath();
+                  ctx.ellipse(-sw / 2, by - 2, 2.5, 2, 0, 0, PI2);
+                  ctx.fill();
+                },
+              );
+
+              ctx.restore();
+
+              // Plate
+              if (rev > 0.5) {
+                ctx.globalAlpha = (rev - 0.5) * 2;
+                shadow(12, "rgba(0,0,0,0.3)");
+                ctx.fillStyle = "rgba(255,255,255,0.96)";
+                ctx.beginPath();
+                ctx.ellipse(
+                  lerp(SLICE_X, SLICE_X - 190, rev),
+                  CY + 72,
+                  80,
+                  14,
+                  0,
+                  0,
+                  PI2,
+                );
+                ctx.fill();
+                noShadow();
+                ctx.globalAlpha = 1;
+              }
+            }
+
+            // Knife
+            if (!sliced) {
+              ctx.save();
+              ctx.translate(SLICE_X, knifeY);
+              // Blade
+              const bg2 = ctx.createLinearGradient(-4, -90, 4, -90);
+              bg2.addColorStop(0, "#B0B0BE");
+              bg2.addColorStop(0.5, "#E8E8F0");
+              bg2.addColorStop(1, "#9090A0");
+              ctx.fillStyle = bg2;
+              ctx.beginPath();
+              ctx.moveTo(-4, -88);
+              ctx.lineTo(4, -88);
+              ctx.bezierCurveTo(6, 0, 6, 60, 4, 130);
+              ctx.lineTo(-2, 130);
+              ctx.bezierCurveTo(-6, 60, -6, 0, -4, -88);
+              ctx.closePath();
+              ctx.fill();
+              // Blade sheen
+              ctx.strokeStyle = "rgba(255,255,255,0.7)";
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(3, -88);
+              ctx.lineTo(5, 130);
+              ctx.stroke();
+              // Handle
+              roundRect(-9, -120, 18, 38, 4, "#3A2010");
+              roundRect(-7, -118, 14, 34, 3, "#6A4020");
+              ctx.restore();
+
+              // Slice % label
+              if (sliceP > 0)
+                txt(
+                  `${Math.round(sliceP * 100)}%`,
+                  SLICE_X + 32,
+                  knifeY,
+                  18,
+                  C.accent,
+                  "left",
+                );
+            }
+
+            drawProgress(revealP, "Serving...");
+            drawStepHeader(this.title, this.hint, 6);
+          },
+        };
+      })();
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  ALL STEPS
+      // ─────────────────────────────────────────────────────────────────────────────
+      const STEPS = [step1, step2, step3, step4, step5, step6, step7];
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  GAME STATE
+      // ─────────────────────────────────────────────────────────────────────────────
+      let state = "title"; // title | step | step_done | result
+      let stepIdx = 0;
+      let scores = [];
+      let frameT = 0;
+
+      const mouse = { x: 0, y: 0, down: false, pressed: false };
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  TITLE SCREEN
+      // ─────────────────────────────────────────────────────────────────────────────
+      function drawTitle() {
+        const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, 520);
+        g.addColorStop(0, "#3D1A08");
+        g.addColorStop(1, "#080300");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+        drawSwooshes();
+
+        // Title
+        shadow(30, "rgba(255,160,0,0.8)");
+        txt("🎂 Roll With It!", W / 2, 78, 56, "#FFD050");
+        noShadow();
+        txt(
+          "Make your own Berry Cream Roll Cake",
+          W / 2,
+          108,
+          19,
+          "rgba(255,225,160,0.8)",
+        );
+
+        // Cake illustration
+        ctx.save();
+        const bob = Math.sin(frameT * 0.04) * 5;
+        ctx.translate(0, bob);
+        shadow(28, "rgba(200,100,0,0.4)");
+        drawRollCake(W / 2, 220, 210, 56);
+        noShadow();
+        ctx.restore();
+
+        // Step preview dots
+        const stepLabels = [
+          "Mix",
+          "Bake",
+          "Cream",
+          "Berries",
+          "Roll",
+          "Nuts",
+          "Slice",
+        ];
+        stepLabels.forEach((name, i) => {
+          const sx = W / 2 - ((stepLabels.length - 1) * 56) / 2 + i * 56,
+            sy = 340;
+          roundRect(
+            sx - 26,
+            sy - 16,
+            52,
+            30,
+            15,
+            "rgba(255,255,255,0.08)",
+            "rgba(255,200,100,0.2)",
+          );
+          txt(name, sx, sy + 6, 13, "rgba(255,225,160,0.8)");
+        });
+
+        // Start button (pulsing)
+        const pulse = 0.92 + Math.sin(frameT * 0.06) * 0.08;
+        ctx.save();
+        ctx.translate(W / 2, 415);
+        ctx.scale(pulse, pulse);
+        shadow(22, "rgba(255,140,0,0.5)");
+        roundRect(-105, -28, 210, 56, 28, "#D06010");
+        roundRect(-103, -26, 206, 52, 27, "#F09040");
+        noShadow();
+        txt("START COOKING!", 0, 8, 22, "#FFF5E0");
+        ctx.restore();
+
+        txt("Click anywhere to begin", W / 2, 490, 15, "rgba(255,200,120,0.5)");
+      }
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  STEP DONE OVERLAY
+      // ─────────────────────────────────────────────────────────────────────────────
+      function drawStepDone() {
+        const step = STEPS[stepIdx];
+        ctx.fillStyle = "rgba(0,0,0,0.65)";
+        ctx.fillRect(0, 0, W, H);
+
+        shadow(24, "rgba(255,200,0,0.5)");
+        txt("Step Complete!", W / 2, 210, 46, "#FFD040");
+        noShadow();
+        txt(`Score: ${step.score} / 100`, W / 2, 262, 30, C.accent);
+        drawStars(step.score, W / 2, 320);
+
+        const label = stepIdx < 6 ? "Next Step  →" : "🎂  See Your Cake!";
+        const pulse = 0.94 + Math.sin(frameT * 0.07) * 0.06;
+        ctx.save();
+        ctx.translate(W / 2, 430);
+        ctx.scale(pulse, pulse);
+        shadow(18, "rgba(255,140,0,0.4)");
+        roundRect(-110, -28, 220, 56, 28, "#D06010");
+        roundRect(-108, -26, 216, 52, 27, "#F09040");
+        noShadow();
+        txt(label, 0, 8, 20, "#FFF5E0");
+        ctx.restore();
+      }
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  RESULT SCREEN
+      // ─────────────────────────────────────────────────────────────────────────────
+      function drawResult() {
+        const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, 520);
+        g.addColorStop(0, "#3D1A08");
+        g.addColorStop(1, "#080300");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+        drawSwooshes();
+
+        shadow(26, "rgba(255,180,0,0.5)");
+        txt("Your Berry Cream Roll Cake!", W / 2, 64, 38, "#FFD050");
+        noShadow();
+
+        // Final cake slice on a plate
+        ctx.save();
+        ctx.translate(W / 2, 215);
+        const bob = Math.sin(frameT * 0.04) * 4;
+        ctx.translate(0, bob);
+
+        // Plate
+        shadow(16, "rgba(0,0,0,0.4)");
+        ctx.fillStyle = "#F8F8FA";
+        ctx.beginPath();
+        ctx.ellipse(0, 68, 105, 18, 0, 0, PI2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.beginPath();
+        ctx.ellipse(0, 68, 95, 14, 0, 0, PI2);
+        ctx.fill();
+        noShadow();
+
+        // Slice (side view)
+        const sw = 56;
+        shadow(20, "rgba(0,0,0,0.4)");
+        ctx.fillStyle = C.nut;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, sw / 2, 54, 0, 0, PI2);
+        ctx.fill();
+        noShadow();
+        ctx.fillStyle = C.sponge;
+        ctx.beginPath();
+        ctx.ellipse(-sw / 2, 0, 14, 54, 0, Math.PI / 2, (Math.PI * 3) / 2);
+        ctx.fill();
+        ctx.fillStyle = C.cream;
+        ctx.beginPath();
+        ctx.ellipse(-sw / 2, 0, 9, 42, 0, Math.PI / 2, (Math.PI * 3) / 2);
+        ctx.fill();
+        [[-15], [-3], [10], [-8], [5], [-22], [18]].forEach(([by]) => {
+          ctx.fillStyle = C.berry1;
+          ctx.beginPath();
+          ctx.ellipse(-sw / 2 + 2, by, 5, 6, 0, 0, PI2);
+          ctx.fill();
+          ctx.fillStyle = C.berry3;
+          ctx.beginPath();
+          ctx.ellipse(-sw / 2, by - 2, 2.5, 2, 0, 0, PI2);
+          ctx.fill();
+        });
+        ctx.restore();
+
+        // Stars & score
+        const total = Math.round(
+          scores.reduce((s, v) => s + v, 0) / scores.length,
+        );
+        const stars = drawStars(total, W / 2, 380);
+        txt(`Total Score: ${total} / 100`, W / 2, 425, 26, C.accent);
+        txt(
+          stars === 3
+            ? "Perfect! You're a pastry chef!"
+            : stars === 2
+              ? "Delicious! Nearly flawless!"
+              : "A tasty first attempt!",
+          W / 2,
+          458,
+          18,
+          C.text,
+        );
+
+        // Per-step scores
+        STEPS.forEach((s, i) => {
+          const sx = W / 2 - ((STEPS.length - 1) * 52) / 2 + i * 52,
+            sy = 498;
+          roundRect(sx - 24, sy - 18, 48, 32, 6, "rgba(0,0,0,0.4)");
+          txt(
+            s.title.split(" ").slice(-1)[0],
+            sx,
+            sy - 4,
+            10,
+            "rgba(255,220,150,0.7)",
+          );
+          txt(`${scores[i] || 0}`, sx, sy + 11, 13, C.accent);
+        });
+
+        // Play again
+        const pulse = 0.94 + Math.sin(frameT * 0.06) * 0.06;
+        ctx.save();
+        ctx.translate(W / 2, 548);
+        ctx.scale(pulse, pulse);
+        shadow(16, "rgba(255,140,0,0.4)");
+        roundRect(-90, -22, 180, 44, 22, "#D06010");
+        roundRect(-88, -20, 176, 40, 21, "#F09040");
+        noShadow();
+        txt("Play Again", 0, 6, 18, "#FFF5E0");
+        ctx.restore();
+      }
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  MAIN LOOP
+      // ─────────────────────────────────────────────────────────────────────────────
+      function loop() {
+        frameT++;
+        ctx.clearRect(0, 0, W, H);
+
+        if (state === "title") {
+          drawTitle();
+        } else if (state === "step") {
+          STEPS[stepIdx].update();
+          STEPS[stepIdx].draw();
+          if (STEPS[stepIdx].complete) state = "step_done";
+        } else if (state === "step_done") {
+          STEPS[stepIdx].draw();
+          drawStepDone();
+        } else if (state === "result") {
+          drawResult();
+        }
+
+        mouse.pressed = false;
+        requestAnimationFrame(loop);
+      }
+
+      // ─────────────────────────────────────────────────────────────────────────────
+      //  INPUT
+      // ─────────────────────────────────────────────────────────────────────────────
+      function getPos(e) {
+        const r = canvas.getBoundingClientRect();
+        const src = e.touches ? e.touches[0] : e;
+        return {
+          x: (src.clientX - r.left) * (W / r.width),
+          y: (src.clientY - r.top) * (H / r.height),
+        };
+      }
+
+      function onDown(e) {
+        if (e.touches) e.preventDefault();
+        const { x, y } = getPos(e);
+        mouse.x = x;
+        mouse.y = y;
+        mouse.down = true;
+        mouse.pressed = true;
+
+        if (state === "title") {
+          stepIdx = 0;
+          scores = [];
+          STEPS[0].init();
+          state = "step";
+        } else if (state === "step") {
+          STEPS[stepIdx].click(x, y);
+        } else if (state === "step_done") {
+          scores[stepIdx] = STEPS[stepIdx].score;
+          stepIdx++;
+          if (stepIdx >= STEPS.length) {
+            state = "result";
+          } else {
+            STEPS[stepIdx].init();
+            state = "step";
+          }
+        } else if (state === "result") {
+          if (y > 526 && y < 570) {
+            stepIdx = 0;
+            scores = [];
+            STEPS[0].init();
+            state = "step";
+          }
+        }
+      }
+
+      function onMove(e) {
+        if (e.touches) e.preventDefault();
+        const { x, y } = getPos(e);
+        mouse.x = x;
+        mouse.y = y;
+      }
+
+      function onUp() {
+        mouse.down = false;
+      }
+
+      canvas.addEventListener("mousedown", onDown);
+      canvas.addEventListener("mousemove", onMove);
+      canvas.addEventListener("mouseup", onUp);
+      canvas.addEventListener("mouseleave", onUp);
+      canvas.addEventListener("touchstart", onDown, { passive: false });
+      canvas.addEventListener("touchmove", onMove, { passive: false });
+      canvas.addEventListener("touchend", onUp);
+
+      loop();
+    </script>
+  </body>
+</html>
