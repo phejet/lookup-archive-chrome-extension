@@ -37,8 +37,8 @@
       // ─────────────────────────────────────────────────────────────────────────────
       //  SETUP
       // ─────────────────────────────────────────────────────────────────────────────
-      const canvas = document.getElementById("game");
-      const ctx = canvas.getContext("2d");
+      const canvas = document.getElementById('game');
+      const ctx = canvas.getContext('2d');
       const W = (canvas.width = 900);
       const H = (canvas.height = 580);
 
@@ -65,20 +65,20 @@
       //  COLOUR PALETTE
       // ─────────────────────────────────────────────────────────────────────────────
       const C = {
-        sponge: "#F0D080",
-        sponge2: "#D4A84B",
-        spongeDark: "#A07830",
-        cream: "#FFF8F0",
-        cream2: "#EEE0C0",
-        berry1: "#C0284A",
-        berry2: "#8B2252",
-        berry3: "#F0608A",
-        nut: "#C49A3C",
-        nut2: "#8B6914",
-        text: "#FFF5E0",
-        accent: "#E8A020",
-        bg1: "#2C1810",
-        bg2: "#0D0502",
+        sponge: '#F0D080',
+        sponge2: '#D4A84B',
+        spongeDark: '#A07830',
+        cream: '#FFF8F0',
+        cream2: '#EEE0C0',
+        berry1: '#C0284A',
+        berry2: '#8B2252',
+        berry3: '#F0608A',
+        nut: '#C49A3C',
+        nut2: '#8B6914',
+        text: '#FFF5E0',
+        accent: '#E8A020',
+        bg1: '#2C1810',
+        bg2: '#0D0502',
       };
 
       // ─────────────────────────────────────────────────────────────────────────────
@@ -90,7 +90,7 @@
       }
       function noShadow() {
         ctx.shadowBlur = 0;
-        ctx.shadowColor = "transparent";
+        ctx.shadowColor = 'transparent';
       }
 
       function roundRect(x, y, w, h, r, fill, stroke, lineW = 2) {
@@ -113,7 +113,7 @@
         }
       }
 
-      function txt(str, x, y, size, color, align = "center") {
+      function txt(str, x, y, size, color, align = 'center') {
         ctx.font = `${size}px Georgia`;
         ctx.fillStyle = color;
         ctx.textAlign = align;
@@ -159,9 +159,9 @@
       // Wooden cutting board surface
       function drawWoodSurface(y) {
         const g = ctx.createLinearGradient(0, y, 0, H);
-        g.addColorStop(0, "#9B6B42");
-        g.addColorStop(0.4, "#7A4E2C");
-        g.addColorStop(1, "#4A2E10");
+        g.addColorStop(0, '#9B6B42');
+        g.addColorStop(0.4, '#7A4E2C');
+        g.addColorStop(1, '#4A2E10');
         ctx.fillStyle = g;
         ctx.fillRect(0, y, W, H - y);
         // wood grain
@@ -235,7 +235,7 @@
         nutData.forEach((n) => {
           const nx = cx + (rx - 7 + n.dr) * Math.cos(n.a) * 0.96;
           const ny = cy + (ry - 4 + n.dr) * Math.sin(n.a) * 0.8;
-          ctx.fillStyle = n.c ? C.nut2 : "#D4A844";
+          ctx.fillStyle = n.c ? C.nut2 : '#D4A844';
           ctx.save();
           ctx.translate(nx, ny);
           ctx.rotate(n.rot);
@@ -251,29 +251,21 @@
         const rx = 52;
         ctx.save();
         // drop shadow
-        ctx.fillStyle = "rgba(0,0,0,0.25)";
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
         ctx.beginPath();
         ctx.ellipse(cx, cy + ry + 10, halfLen * 0.9, 14, 0, 0, PI2);
         ctx.fill();
 
         // body gradient
         const bg = ctx.createLinearGradient(cx, cy - ry, cx, cy + ry);
-        bg.addColorStop(0, "#DDB050");
-        bg.addColorStop(0.12, "#EAC868");
-        bg.addColorStop(0.5, "#C49030");
-        bg.addColorStop(0.88, "#A07820");
-        bg.addColorStop(1, "#7A5A10");
+        bg.addColorStop(0, '#DDB050');
+        bg.addColorStop(0.12, '#EAC868');
+        bg.addColorStop(0.5, '#C49030');
+        bg.addColorStop(0.88, '#A07820');
+        bg.addColorStop(1, '#7A5A10');
         ctx.fillStyle = bg;
         ctx.beginPath();
-        ctx.ellipse(
-          cx - halfLen,
-          cy,
-          14,
-          ry,
-          0,
-          Math.PI / 2,
-          (Math.PI * 3) / 2,
-        );
+        ctx.ellipse(cx - halfLen, cy, 14, ry, 0, Math.PI / 2, (Math.PI * 3) / 2);
         ctx.rect(cx - halfLen, cy - ry, halfLen * 2, ry * 2);
         ctx.ellipse(cx + halfLen, cy, 14, ry, 0, 0, PI2);
         ctx.fill();
@@ -281,24 +273,14 @@
         // top nut scatter (seeded)
         const TOP_NUTS = 55;
         for (let i = 0; i < TOP_NUTS; i++) {
-          const px =
-            cx - halfLen + 10 + srandRange(i * 9, 0, 1) * (halfLen * 2 - 20);
+          const px = cx - halfLen + 10 + srandRange(i * 9, 0, 1) * (halfLen * 2 - 20);
           const py = cy - ry + 3 + srandRange(i * 9 + 1, 0, 1) * 10;
-          ctx.fillStyle =
-            srandRange(i * 9 + 2, 0, 1) > 0.5 ? C.nut2 : "#D4A844";
+          ctx.fillStyle = srandRange(i * 9 + 2, 0, 1) > 0.5 ? C.nut2 : '#D4A844';
           ctx.save();
           ctx.translate(px, py);
           ctx.rotate(srandRange(i * 9 + 3, 0, Math.PI));
           ctx.beginPath();
-          ctx.ellipse(
-            0,
-            0,
-            srandRange(i * 9 + 4, 3, 7),
-            srandRange(i * 9 + 5, 2, 4),
-            0,
-            0,
-            PI2,
-          );
+          ctx.ellipse(0, 0, srandRange(i * 9 + 4, 3, 7), srandRange(i * 9 + 5, 2, 4), 0, 0, PI2);
           ctx.fill();
           ctx.restore();
         }
@@ -320,21 +302,15 @@
           ph = 26,
           px = (W - pw) / 2,
           py = H - 52;
-        roundRect(px, py, pw, ph, ph / 2, "rgba(0,0,0,0.45)");
+        roundRect(px, py, pw, ph, ph / 2, 'rgba(0,0,0,0.45)');
         if (val > 0) {
           const g = ctx.createLinearGradient(px, 0, px + pw, 0);
-          g.addColorStop(0, "#D06010");
-          g.addColorStop(1, "#FFD040");
+          g.addColorStop(0, '#D06010');
+          g.addColorStop(1, '#FFD040');
           roundRect(px, py, Math.max(ph, val * pw), ph, ph / 2, g);
         }
-        txt(label, W / 2, py - 8, 15, "rgba(255,240,200,0.85)");
-        txt(
-          `${Math.round(val * 100)}%`,
-          W / 2,
-          py + ph / 2 + 6,
-          14,
-          "rgba(255,255,255,0.9)",
-        );
+        txt(label, W / 2, py - 8, 15, 'rgba(255,240,200,0.85)');
+        txt(`${Math.round(val * 100)}%`, W / 2, py + ph / 2 + 6, 14, 'rgba(255,255,255,0.9)');
       }
 
       // ─────────────────────────────────────────────────────────────────────────────
@@ -345,34 +321,27 @@
           gy = 140,
           gw = 28,
           gh = 280;
-        roundRect(gx, gy, gw, gh, gw / 2, "rgba(0,0,0,0.5)");
+        roundRect(gx, gy, gw, gh, gw / 2, 'rgba(0,0,0,0.5)');
         // green zone
-        roundRect(
-          gx,
-          gy + (1 - hi) * gh,
-          gw,
-          (hi - lo) * gh,
-          4,
-          "rgba(60,220,60,0.35)",
-        );
+        roundRect(gx, gy + (1 - hi) * gh, gw, (hi - lo) * gh, 4, 'rgba(60,220,60,0.35)');
         // fill
         const fh = temp * gh;
-        const tc = temp > hi ? "#F04040" : temp < lo ? "#4080FF" : "#50E050";
+        const tc = temp > hi ? '#F04040' : temp < lo ? '#4080FF' : '#50E050';
         const g = ctx.createLinearGradient(0, gy + gh, 0, gy + gh - fh);
         g.addColorStop(0, tc);
-        g.addColorStop(1, "rgba(255,210,30,0.8)");
+        g.addColorStop(1, 'rgba(255,210,30,0.8)');
         roundRect(gx, gy + gh - fh, gw, fh, gw / 2, g);
-        txt("TEMP", gx + gw / 2, gy - 10, 13, C.text);
-        txt("🔥", gx + gw + 10, gy + 14, 14, "#F07070", "left");
+        txt('TEMP', gx + gw / 2, gy - 10, 13, C.text);
+        txt('🔥', gx + gw + 10, gy + 14, 14, '#F07070', 'left');
         txt(
-          "✓",
+          '✓',
           gx + gw + 10,
           gy + (1 - hi) * gh + ((hi - lo) * gh) / 2 + 5,
           16,
-          "#70F070",
-          "left",
+          '#70F070',
+          'left',
         );
-        txt("❄", gx + gw + 10, gy + gh - 10, 14, "#80A0FF", "left");
+        txt('❄', gx + gw + 10, gy + gh - 10, 14, '#80A0FF', 'left');
       }
 
       // ─────────────────────────────────────────────────────────────────────────────
@@ -384,8 +353,8 @@
           const sx = cx - 60 + i * 60;
           ctx.save();
           ctx.translate(sx, cy);
-          if (i < stars) shadow(18, "#FFD040");
-          ctx.fillStyle = i < stars ? "#FFD040" : "rgba(255,255,255,0.15)";
+          if (i < stars) shadow(18, '#FFD040');
+          ctx.fillStyle = i < stars ? '#FFD040' : 'rgba(255,255,255,0.15)';
           ctx.beginPath();
           for (let p = 0; p < 10; p++) {
             const a = (p * Math.PI) / 5 - Math.PI / 2;
@@ -407,21 +376,17 @@
       // ─────────────────────────────────────────────────────────────────────────────
       function drawStepHeader(title, hint, stepIdx) {
         // top pill
-        roundRect(W / 2 - 230, 6, 460, 36, 18, "rgba(0,0,0,0.55)");
+        roundRect(W / 2 - 230, 6, 460, 36, 18, 'rgba(0,0,0,0.55)');
         txt(`Step ${stepIdx + 1}/7 — ${title}`, W / 2, 30, 17, C.accent);
         // hint pill
-        roundRect(W / 2 - 260, H - 88, 520, 28, 14, "rgba(0,0,0,0.45)");
-        txt(hint, W / 2, H - 68, 14, "rgba(255,240,200,0.9)");
+        roundRect(W / 2 - 260, H - 88, 520, 28, 14, 'rgba(0,0,0,0.45)');
+        txt(hint, W / 2, H - 68, 14, 'rgba(255,240,200,0.9)');
         // small step dots
         for (let i = 0; i < 7; i++) {
           const dx = W / 2 - 3 * 22 + i * 22,
             dy = 50;
           ctx.fillStyle =
-            i < stepIdx
-              ? "#FFD040"
-              : i === stepIdx
-                ? "#FF8040"
-                : "rgba(255,255,255,0.2)";
+            i < stepIdx ? '#FFD040' : i === stepIdx ? '#FF8040' : 'rgba(255,255,255,0.2)';
           ctx.beginPath();
           ctx.arc(dx, dy, 7, 0, PI2);
           ctx.fill();
@@ -436,8 +401,8 @@
           whiskAngle = 0,
           particles = [];
         return {
-          title: "Mix the Batter",
-          hint: "Click and hold rapidly to beat the eggs & flour!",
+          title: 'Mix the Batter',
+          hint: 'Click and hold rapidly to beat the eggs & flour!',
           complete: false,
           score: 0,
           init() {
@@ -472,20 +437,19 @@
                 vx: rand(-7, 7),
                 vy: rand(-9, -2),
                 life: 55,
-                color:
-                  i % 3 === 0 ? C.sponge : i % 3 === 1 ? C.cream : "#F0E080",
+                color: i % 3 === 0 ? C.sponge : i % 3 === 1 ? C.cream : '#F0E080',
               });
           },
           draw() {
-            drawBackground("#3D2010", "#160804");
+            drawBackground('#3D2010', '#160804');
             drawSwooshes();
             drawWoodSurface(430);
 
             // Bowl body (bezier silhouette)
-            shadow(20, "rgba(0,0,0,0.5)");
+            shadow(20, 'rgba(0,0,0,0.5)');
             const bg2 = ctx.createLinearGradient(0, 300, 0, 440);
-            bg2.addColorStop(0, "#EEE0C8");
-            bg2.addColorStop(1, "#D8C8A8");
+            bg2.addColorStop(0, '#EEE0C8');
+            bg2.addColorStop(1, '#D8C8A8');
             ctx.fillStyle = bg2;
             ctx.beginPath();
             ctx.moveTo(295, 438);
@@ -498,11 +462,11 @@
             noShadow();
 
             // Bowl rim (ellipse)
-            ctx.fillStyle = "#F4ECD8";
+            ctx.fillStyle = '#F4ECD8';
             ctx.beginPath();
             ctx.ellipse(450, 302, 162, 24, 0, 0, PI2);
             ctx.fill();
-            ctx.strokeStyle = "#D0C0A0";
+            ctx.strokeStyle = '#D0C0A0';
             ctx.lineWidth = 3;
             ctx.beginPath();
             ctx.ellipse(450, 302, 162, 24, 0, 0, PI2);
@@ -512,8 +476,8 @@
             if (mixLevel > 0) {
               const by = lerp(435, 318, mixLevel);
               const batg = ctx.createLinearGradient(0, by, 0, 435);
-              batg.addColorStop(0, "#F5D870");
-              batg.addColorStop(1, "#C89030");
+              batg.addColorStop(0, '#F5D870');
+              batg.addColorStop(1, '#C89030');
               ctx.fillStyle = batg;
               ctx.beginPath();
               ctx.moveTo(300, 435);
@@ -524,19 +488,11 @@
               ctx.closePath();
               ctx.fill();
               // Swirl lines on batter
-              ctx.strokeStyle = "rgba(220,170,40,0.5)";
+              ctx.strokeStyle = 'rgba(220,170,40,0.5)';
               ctx.lineWidth = 2;
               for (let i = 0; i < 3; i++) {
                 ctx.beginPath();
-                ctx.ellipse(
-                  450,
-                  by + 20 + i * 18,
-                  80 - i * 20,
-                  8 - i * 2,
-                  0,
-                  0,
-                  PI2,
-                );
+                ctx.ellipse(450, by + 20 + i * 18, 80 - i * 20, 8 - i * 2, 0, 0, PI2);
                 ctx.stroke();
               }
             }
@@ -546,38 +502,24 @@
             ctx.translate(450, 285 + Math.sin(whiskAngle) * 14);
             ctx.rotate(Math.sin(whiskAngle * 2.1) * 0.5);
             // handle
-            ctx.strokeStyle = "#999";
+            ctx.strokeStyle = '#999';
             ctx.lineWidth = 9;
-            ctx.lineCap = "round";
+            ctx.lineCap = 'round';
             ctx.beginPath();
             ctx.moveTo(0, -90);
             ctx.lineTo(0, 0);
             ctx.stroke();
-            ctx.strokeStyle = "#BBB";
+            ctx.strokeStyle = '#BBB';
             ctx.lineWidth = 2.5;
             for (let i = 0; i < 4; i++) {
               const a = (i / 4) * Math.PI;
               ctx.beginPath();
               ctx.moveTo(0, 0);
-              ctx.bezierCurveTo(
-                Math.cos(a) * 28,
-                22,
-                Math.cos(a) * 22,
-                52,
-                0,
-                62,
-              );
+              ctx.bezierCurveTo(Math.cos(a) * 28, 22, Math.cos(a) * 22, 52, 0, 62);
               ctx.stroke();
               ctx.beginPath();
               ctx.moveTo(0, 0);
-              ctx.bezierCurveTo(
-                -Math.cos(a) * 28,
-                22,
-                -Math.cos(a) * 22,
-                52,
-                0,
-                62,
-              );
+              ctx.bezierCurveTo(-Math.cos(a) * 28, 22, -Math.cos(a) * 22, 52, 0, 62);
               ctx.stroke();
             }
             ctx.restore();
@@ -592,7 +534,7 @@
             });
             ctx.globalAlpha = 1;
 
-            drawProgress(mixLevel, "Mix Level");
+            drawProgress(mixLevel, 'Mix Level');
             drawStepHeader(this.title, this.hint, 0);
           },
         };
@@ -608,8 +550,8 @@
           HI = 0.72;
         let smoke = [];
         return {
-          title: "Bake the Sponge",
-          hint: "Hold click to heat — keep temperature in the green zone!",
+          title: 'Bake the Sponge',
+          hint: 'Hold click to heat — keep temperature in the green zone!',
           complete: false,
           score: 0,
           init() {
@@ -651,50 +593,37 @@
           },
           click() {},
           draw() {
-            drawBackground("#200E06", "#0A0402");
+            drawBackground('#200E06', '#0A0402');
             drawSwooshes();
 
             // Oven glow on wall
             const glow = ctx.createRadialGradient(450, 310, 0, 450, 310, 280);
-            glow.addColorStop(
-              0,
-              `rgba(255,${Math.floor(60 + temp * 80)},0,${temp * 0.3})`,
-            );
-            glow.addColorStop(1, "transparent");
+            glow.addColorStop(0, `rgba(255,${Math.floor(60 + temp * 80)},0,${temp * 0.3})`);
+            glow.addColorStop(1, 'transparent');
             ctx.fillStyle = glow;
             ctx.fillRect(0, 0, W, H);
 
             // Oven body
-            shadow(
-              25,
-              `rgba(255,${Math.floor(80 + temp * 120)},0,${0.3 + temp * 0.3})`,
-            );
-            roundRect(170, 130, 560, 360, 22, "#4A4A4A");
+            shadow(25, `rgba(255,${Math.floor(80 + temp * 120)},0,${0.3 + temp * 0.3})`);
+            roundRect(170, 130, 560, 360, 22, '#4A4A4A');
             noShadow();
-            roundRect(180, 140, 540, 340, 16, "#383838");
+            roundRect(180, 140, 540, 340, 16, '#383838');
 
             // Heating coils
             const coilColor = `rgb(${Math.floor(temp * 255)},${Math.floor(temp * 60)},0)`;
             ctx.strokeStyle = coilColor;
             ctx.lineWidth = 7;
-            ctx.lineCap = "round";
+            ctx.lineCap = 'round';
             for (let i = 0; i < 3; i++) {
               ctx.beginPath();
               ctx.moveTo(210, 195 + i * 48);
-              ctx.bezierCurveTo(
-                340,
-                188 + i * 48,
-                560,
-                202 + i * 48,
-                690,
-                195 + i * 48,
-              );
+              ctx.bezierCurveTo(340, 188 + i * 48, 560, 202 + i * 48, 690, 195 + i * 48);
               ctx.stroke();
             }
 
             // Cake pan
-            shadow(10, "rgba(0,0,0,0.6)");
-            roundRect(280, 320, 340, 65, 8, "#8A8A8A");
+            shadow(10, 'rgba(0,0,0,0.6)');
+            roundRect(280, 320, 340, 65, 8, '#8A8A8A');
             noShadow();
 
             // Sponge inside pan
@@ -709,7 +638,7 @@
             // Steam wisps
             smoke.forEach((p) => {
               ctx.globalAlpha = (p.life / 90) * 0.5;
-              ctx.fillStyle = "#DDD";
+              ctx.fillStyle = '#DDD';
               ctx.beginPath();
               ctx.arc(p.x, p.y, p.r, 0, PI2);
               ctx.fill();
@@ -717,11 +646,11 @@
             ctx.globalAlpha = 1;
 
             // Oven door glass overlay
-            ctx.fillStyle = "rgba(0,20,40,0.18)";
-            roundRect(185, 145, 530, 320, 14, "rgba(0,20,40,0.18)");
+            ctx.fillStyle = 'rgba(0,20,40,0.18)';
+            roundRect(185, 145, 530, 320, 14, 'rgba(0,20,40,0.18)');
 
             drawTempGauge(temp, LO, HI);
-            drawProgress(bake, "Baking Progress");
+            drawProgress(bake, 'Baking Progress');
             drawStepHeader(this.title, this.hint, 1);
           },
         };
@@ -733,8 +662,8 @@
       const step3 = (() => {
         let coverage = new Float32Array(40);
         return {
-          title: "Spread the Cream",
-          hint: "Drag across the sponge to spread the cream!",
+          title: 'Spread the Cream',
+          hint: 'Drag across the sponge to spread the cream!',
           complete: false,
           score: 0,
           init() {
@@ -750,10 +679,8 @@
                 const cell = Math.floor(((mx - 130) / 640) * 40);
                 if (cell >= 0 && cell < 40) {
                   coverage[cell] = clamp(coverage[cell] + 0.18, 0, 1);
-                  if (cell > 0)
-                    coverage[cell - 1] = clamp(coverage[cell - 1] + 0.06, 0, 1);
-                  if (cell < 39)
-                    coverage[cell + 1] = clamp(coverage[cell + 1] + 0.06, 0, 1);
+                  if (cell > 0) coverage[cell - 1] = clamp(coverage[cell - 1] + 0.06, 0, 1);
+                  if (cell < 39) coverage[cell + 1] = clamp(coverage[cell + 1] + 0.06, 0, 1);
                 }
               }
             }
@@ -765,32 +692,25 @@
           },
           click() {},
           draw() {
-            drawBackground("#3A2010", "#160804");
+            drawBackground('#3A2010', '#160804');
             drawSwooshes();
             drawWoodSurface(400);
 
             // Flat sponge
-            shadow(14, "rgba(0,0,0,0.4)");
+            shadow(14, 'rgba(0,0,0,0.4)');
             const sg = ctx.createLinearGradient(0, 238, 0, 372);
-            sg.addColorStop(0, "#F5DC88");
-            sg.addColorStop(1, "#C89038");
+            sg.addColorStop(0, '#F5DC88');
+            sg.addColorStop(1, '#C89038');
             roundRect(130, 238, 640, 134, 10, sg);
             noShadow();
 
             // Sponge texture grain
-            ctx.strokeStyle = "rgba(160,110,30,0.25)";
+            ctx.strokeStyle = 'rgba(160,110,30,0.25)';
             ctx.lineWidth = 1;
             for (let i = 0; i < 9; i++) {
               ctx.beginPath();
               ctx.moveTo(130, 246 + i * 14);
-              ctx.bezierCurveTo(
-                340,
-                242 + i * 14,
-                560,
-                250 + i * 14,
-                770,
-                246 + i * 14,
-              );
+              ctx.bezierCurveTo(340, 242 + i * 14, 560, 250 + i * 14, 770, 246 + i * 14);
               ctx.stroke();
             }
 
@@ -822,12 +742,12 @@
             ctx.save();
             ctx.translate(mouse.x, clamp(mouse.y, 200, 390));
             ctx.rotate(0.45);
-            roundRect(-4, -55, 8, 72, 4, "#B09050"); // handle
-            roundRect(-13, 17, 26, 34, 3, "#E8E0D0"); // blade
+            roundRect(-4, -55, 8, 72, 4, '#B09050'); // handle
+            roundRect(-13, 17, 26, 34, 3, '#E8E0D0'); // blade
             ctx.restore();
 
             const covered = coverage.reduce((s, v) => s + v, 0) / 40;
-            drawProgress(covered, "Cream Coverage");
+            drawProgress(covered, 'Cream Coverage');
             drawStepHeader(this.title, this.hint, 2);
           },
         };
@@ -840,7 +760,7 @@
         const NEEDED = 12;
         let berries = [];
         return {
-          title: "Drop the Berries",
+          title: 'Drop the Berries',
           hint: `Click on the cream to place ${NEEDED} berries!`,
           complete: false,
           score: 0,
@@ -861,20 +781,12 @@
                 const i = clamp(Math.floor((b.x - 130) / 80), 0, 7);
                 bins[i]++;
               });
-              const evenness =
-                1 -
-                bins.reduce((s, v) => s + Math.abs(v - NEEDED / 8), 0) / NEEDED;
+              const evenness = 1 - bins.reduce((s, v) => s + Math.abs(v - NEEDED / 8), 0) / NEEDED;
               this.score = Math.round(clamp(evenness * 35 + 65, 65, 100));
             }
           },
           click(x, y) {
-            if (
-              y > 244 &&
-              y < 368 &&
-              x > 140 &&
-              x < 760 &&
-              berries.length < NEEDED * 1.5
-            ) {
+            if (y > 244 && y < 368 && x > 140 && x < 760 && berries.length < NEEDED * 1.5) {
               berries.push({
                 x,
                 y: clamp(y, 260, 350),
@@ -884,12 +796,12 @@
             }
           },
           draw() {
-            drawBackground("#3A2010", "#160804");
+            drawBackground('#3A2010', '#160804');
             drawSwooshes();
             drawWoodSurface(400);
 
             // Sponge
-            shadow(14, "rgba(0,0,0,0.4)");
+            shadow(14, 'rgba(0,0,0,0.4)');
             roundRect(130, 238, 640, 134, 10, C.sponge);
             noShadow();
             // Cream layer
@@ -900,7 +812,7 @@
               ctx.save();
               ctx.translate(b.x, b.y);
               ctx.scale(b.scale, b.scale);
-              shadow(8, "rgba(0,0,0,0.4)");
+              shadow(8, 'rgba(0,0,0,0.4)');
               ctx.fillStyle = C.berry1;
               ctx.beginPath();
               ctx.ellipse(0, 0, 11, 10, 0, 0, PI2);
@@ -915,9 +827,9 @@
               ctx.ellipse(-3, -3, 4, 3, 0, 0, PI2);
               ctx.fill();
               // tiny stem
-              ctx.strokeStyle = "#3A7030";
+              ctx.strokeStyle = '#3A7030';
               ctx.lineWidth = 1.8;
-              ctx.lineCap = "round";
+              ctx.lineCap = 'round';
               ctx.beginPath();
               ctx.moveTo(0, -10);
               ctx.quadraticCurveTo(4, -18, 2, -23);
@@ -925,14 +837,8 @@
               ctx.restore();
             });
 
-            txt(
-              `${berries.length} / ${NEEDED} berries placed`,
-              W / 2,
-              430,
-              20,
-              C.accent,
-            );
-            drawProgress(berries.length / NEEDED, "Berries Placed");
+            txt(`${berries.length} / ${NEEDED} berries placed`, W / 2, 430, 20, C.accent);
+            drawProgress(berries.length / NEEDED, 'Berries Placed');
             drawStepHeader(this.title, this.hint, 3);
           },
         };
@@ -945,8 +851,8 @@
         let rollP = 0,
           particles = [];
         return {
-          title: "Roll It Up!",
-          hint: "Drag from left to right to roll the cake!",
+          title: 'Roll It Up!',
+          hint: 'Drag from left to right to roll the cake!',
           complete: false,
           score: 0,
           init() {
@@ -985,7 +891,7 @@
           },
           click() {},
           draw() {
-            drawBackground("#3A2010", "#160804");
+            drawBackground('#3A2010', '#160804');
             drawSwooshes();
             drawWoodSurface(400);
 
@@ -996,7 +902,7 @@
 
             // Flat tail still unrolled
             if (rollP < 1) {
-              shadow(8, "rgba(0,0,0,0.3)");
+              shadow(8, 'rgba(0,0,0,0.3)');
               roundRect(rollX, 238, 770 - rollX, 134, 6, C.sponge);
               noShadow();
               roundRect(rollX + 2, 242, 768 - rollX, 128, 5, C.cream);
@@ -1014,9 +920,9 @@
 
             // Rolled cylinder
             if (rollP > 0.02) {
-              shadow(18, "rgba(0,0,0,0.5)");
+              shadow(18, 'rgba(0,0,0,0.5)');
               // ground shadow
-              ctx.fillStyle = "rgba(0,0,0,0.25)";
+              ctx.fillStyle = 'rgba(0,0,0,0.25)';
               ctx.beginPath();
               ctx.ellipse(rollX - len / 2, cy + ry + 6, len / 2, 10, 0, 0, PI2);
               ctx.fill();
@@ -1028,15 +934,7 @@
               bg2.addColorStop(1, C.nut2);
               ctx.fillStyle = bg2;
               ctx.beginPath();
-              ctx.ellipse(
-                rollX - len,
-                cy,
-                13,
-                ry,
-                0,
-                Math.PI / 2,
-                (Math.PI * 3) / 2,
-              );
+              ctx.ellipse(rollX - len, cy, 13, ry, 0, Math.PI / 2, (Math.PI * 3) / 2);
               ctx.rect(rollX - len, cy - ry, len, ry * 2);
               ctx.lineTo(rollX, cy - ry);
               ctx.lineTo(rollX, cy + ry);
@@ -1064,7 +962,7 @@
             });
             ctx.globalAlpha = 1;
 
-            drawProgress(rollP, "Rolling Progress");
+            drawProgress(rollP, 'Rolling Progress');
             drawStepHeader(this.title, this.hint, 4);
           },
         };
@@ -1077,8 +975,8 @@
         let nuts = [],
           coverage = 0;
         return {
-          title: "Coat with Nuts",
-          hint: "Click rapidly to shake crushed nuts all over the roll!",
+          title: 'Coat with Nuts',
+          hint: 'Click rapidly to shake crushed nuts all over the roll!',
           complete: false,
           score: 0,
           init() {
@@ -1133,12 +1031,12 @@
               });
           },
           draw() {
-            drawBackground("#1E0C04", "#0A0402");
+            drawBackground('#1E0C04', '#0A0402');
             drawSwooshes();
             drawWoodSurface(410);
 
             // Drop shadow
-            ctx.fillStyle = "rgba(0,0,0,0.3)";
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
             ctx.beginPath();
             ctx.ellipse(450, 362, 228, 16, 0, 0, PI2);
             ctx.fill();
@@ -1203,7 +1101,7 @@
               ctx.fill();
             });
 
-            drawProgress(coverage, "Nut Coverage");
+            drawProgress(coverage, 'Nut Coverage');
             drawStepHeader(this.title, this.hint, 5);
           },
         };
@@ -1218,8 +1116,8 @@
           sliced = false,
           revealP = 0;
         return {
-          title: "Slice & Serve!",
-          hint: "Drag the knife down to cut a perfect slice!",
+          title: 'Slice & Serve!',
+          hint: 'Drag the knife down to cut a perfect slice!',
           complete: false,
           score: 0,
           init() {
@@ -1244,7 +1142,7 @@
           },
           click() {},
           draw() {
-            drawBackground("#1E0C04", "#0A0402");
+            drawBackground('#1E0C04', '#0A0402');
             drawSwooshes();
             drawWoodSurface(410);
 
@@ -1253,7 +1151,7 @@
 
             // Main roll (partially hidden behind slice when revealed)
             if (revealP < 1) {
-              ctx.fillStyle = "rgba(0,0,0,0.25)";
+              ctx.fillStyle = 'rgba(0,0,0,0.25)';
               ctx.beginPath();
               ctx.ellipse(450, 362, 228, 16, 0, 0, PI2);
               ctx.fill();
@@ -1273,10 +1171,7 @@
               for (let i = 0; i < 44; i++) {
                 ctx.fillStyle = i % 2 ? C.nut : C.nut2;
                 ctx.save();
-                ctx.translate(
-                  220 + srandRange(i * 11, 0, 460),
-                  242 + srandRange(i * 11 + 1, 0, 8),
-                );
+                ctx.translate(220 + srandRange(i * 11, 0, 460), 242 + srandRange(i * 11 + 1, 0, 8));
                 ctx.rotate(srandRange(i * 11 + 2, 0, Math.PI));
                 ctx.beginPath();
                 ctx.ellipse(
@@ -1303,7 +1198,7 @@
               ctx.save();
               ctx.translate(sliceDrawX, CY);
               ctx.rotate(tilt);
-              shadow(20, "rgba(0,0,0,0.5)");
+              shadow(20, 'rgba(0,0,0,0.5)');
 
               // Nut exterior
               ctx.fillStyle = C.nut;
@@ -1315,15 +1210,7 @@
               // Sponge ring
               ctx.fillStyle = C.sponge;
               ctx.beginPath();
-              ctx.ellipse(
-                -sw / 2,
-                0,
-                14,
-                58,
-                0,
-                Math.PI / 2,
-                (Math.PI * 3) / 2,
-              );
+              ctx.ellipse(-sw / 2, 0, 14, 58, 0, Math.PI / 2, (Math.PI * 3) / 2);
               ctx.fill();
 
               // Cream interior
@@ -1333,36 +1220,26 @@
               ctx.fill();
 
               // Berries in cross-section
-              [[-14], [-2], [12], [-8], [6], [-20], [18], [0]].forEach(
-                ([by]) => {
-                  ctx.fillStyle = C.berry1;
-                  ctx.beginPath();
-                  ctx.ellipse(-sw / 2 + 2, by, 5, 6, 0, 0, PI2);
-                  ctx.fill();
-                  ctx.fillStyle = C.berry3;
-                  ctx.beginPath();
-                  ctx.ellipse(-sw / 2, by - 2, 2.5, 2, 0, 0, PI2);
-                  ctx.fill();
-                },
-              );
+              [[-14], [-2], [12], [-8], [6], [-20], [18], [0]].forEach(([by]) => {
+                ctx.fillStyle = C.berry1;
+                ctx.beginPath();
+                ctx.ellipse(-sw / 2 + 2, by, 5, 6, 0, 0, PI2);
+                ctx.fill();
+                ctx.fillStyle = C.berry3;
+                ctx.beginPath();
+                ctx.ellipse(-sw / 2, by - 2, 2.5, 2, 0, 0, PI2);
+                ctx.fill();
+              });
 
               ctx.restore();
 
               // Plate
               if (rev > 0.5) {
                 ctx.globalAlpha = (rev - 0.5) * 2;
-                shadow(12, "rgba(0,0,0,0.3)");
-                ctx.fillStyle = "rgba(255,255,255,0.96)";
+                shadow(12, 'rgba(0,0,0,0.3)');
+                ctx.fillStyle = 'rgba(255,255,255,0.96)';
                 ctx.beginPath();
-                ctx.ellipse(
-                  lerp(SLICE_X, SLICE_X - 190, rev),
-                  CY + 72,
-                  80,
-                  14,
-                  0,
-                  0,
-                  PI2,
-                );
+                ctx.ellipse(lerp(SLICE_X, SLICE_X - 190, rev), CY + 72, 80, 14, 0, 0, PI2);
                 ctx.fill();
                 noShadow();
                 ctx.globalAlpha = 1;
@@ -1375,9 +1252,9 @@
               ctx.translate(SLICE_X, knifeY);
               // Blade
               const bg2 = ctx.createLinearGradient(-4, -90, 4, -90);
-              bg2.addColorStop(0, "#B0B0BE");
-              bg2.addColorStop(0.5, "#E8E8F0");
-              bg2.addColorStop(1, "#9090A0");
+              bg2.addColorStop(0, '#B0B0BE');
+              bg2.addColorStop(0.5, '#E8E8F0');
+              bg2.addColorStop(1, '#9090A0');
               ctx.fillStyle = bg2;
               ctx.beginPath();
               ctx.moveTo(-4, -88);
@@ -1388,30 +1265,23 @@
               ctx.closePath();
               ctx.fill();
               // Blade sheen
-              ctx.strokeStyle = "rgba(255,255,255,0.7)";
+              ctx.strokeStyle = 'rgba(255,255,255,0.7)';
               ctx.lineWidth = 1;
               ctx.beginPath();
               ctx.moveTo(3, -88);
               ctx.lineTo(5, 130);
               ctx.stroke();
               // Handle
-              roundRect(-9, -120, 18, 38, 4, "#3A2010");
-              roundRect(-7, -118, 14, 34, 3, "#6A4020");
+              roundRect(-9, -120, 18, 38, 4, '#3A2010');
+              roundRect(-7, -118, 14, 34, 3, '#6A4020');
               ctx.restore();
 
               // Slice % label
               if (sliceP > 0)
-                txt(
-                  `${Math.round(sliceP * 100)}%`,
-                  SLICE_X + 32,
-                  knifeY,
-                  18,
-                  C.accent,
-                  "left",
-                );
+                txt(`${Math.round(sliceP * 100)}%`, SLICE_X + 32, knifeY, 18, C.accent, 'left');
             }
 
-            drawProgress(revealP, "Serving...");
+            drawProgress(revealP, 'Serving...');
             drawStepHeader(this.title, this.hint, 6);
           },
         };
@@ -1425,7 +1295,7 @@
       // ─────────────────────────────────────────────────────────────────────────────
       //  GAME STATE
       // ─────────────────────────────────────────────────────────────────────────────
-      let state = "title"; // title | step | step_done | result
+      let state = 'title'; // title | step | step_done | result
       let stepIdx = 0;
       let scores = [];
       let frameT = 0;
@@ -1437,43 +1307,29 @@
       // ─────────────────────────────────────────────────────────────────────────────
       function drawTitle() {
         const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, 520);
-        g.addColorStop(0, "#3D1A08");
-        g.addColorStop(1, "#080300");
+        g.addColorStop(0, '#3D1A08');
+        g.addColorStop(1, '#080300');
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, W, H);
         drawSwooshes();
 
         // Title
-        shadow(30, "rgba(255,160,0,0.8)");
-        txt("🎂 Roll With It!", W / 2, 78, 56, "#FFD050");
+        shadow(30, 'rgba(255,160,0,0.8)');
+        txt('🎂 Roll With It!', W / 2, 78, 56, '#FFD050');
         noShadow();
-        txt(
-          "Make your own Berry Cream Roll Cake",
-          W / 2,
-          108,
-          19,
-          "rgba(255,225,160,0.8)",
-        );
+        txt('Make your own Berry Cream Roll Cake', W / 2, 108, 19, 'rgba(255,225,160,0.8)');
 
         // Cake illustration
         ctx.save();
         const bob = Math.sin(frameT * 0.04) * 5;
         ctx.translate(0, bob);
-        shadow(28, "rgba(200,100,0,0.4)");
+        shadow(28, 'rgba(200,100,0,0.4)');
         drawRollCake(W / 2, 220, 210, 56);
         noShadow();
         ctx.restore();
 
         // Step preview dots
-        const stepLabels = [
-          "Mix",
-          "Bake",
-          "Cream",
-          "Berries",
-          "Roll",
-          "Nuts",
-          "Slice",
-        ];
+        const stepLabels = ['Mix', 'Bake', 'Cream', 'Berries', 'Roll', 'Nuts', 'Slice'];
         stepLabels.forEach((name, i) => {
           const sx = W / 2 - ((stepLabels.length - 1) * 56) / 2 + i * 56,
             sy = 340;
@@ -1483,10 +1339,10 @@
             52,
             30,
             15,
-            "rgba(255,255,255,0.08)",
-            "rgba(255,200,100,0.2)",
+            'rgba(255,255,255,0.08)',
+            'rgba(255,200,100,0.2)',
           );
-          txt(name, sx, sy + 6, 13, "rgba(255,225,160,0.8)");
+          txt(name, sx, sy + 6, 13, 'rgba(255,225,160,0.8)');
         });
 
         // Start button (pulsing)
@@ -1494,14 +1350,14 @@
         ctx.save();
         ctx.translate(W / 2, 415);
         ctx.scale(pulse, pulse);
-        shadow(22, "rgba(255,140,0,0.5)");
-        roundRect(-105, -28, 210, 56, 28, "#D06010");
-        roundRect(-103, -26, 206, 52, 27, "#F09040");
+        shadow(22, 'rgba(255,140,0,0.5)');
+        roundRect(-105, -28, 210, 56, 28, '#D06010');
+        roundRect(-103, -26, 206, 52, 27, '#F09040');
         noShadow();
-        txt("START COOKING!", 0, 8, 22, "#FFF5E0");
+        txt('START COOKING!', 0, 8, 22, '#FFF5E0');
         ctx.restore();
 
-        txt("Click anywhere to begin", W / 2, 490, 15, "rgba(255,200,120,0.5)");
+        txt('Click anywhere to begin', W / 2, 490, 15, 'rgba(255,200,120,0.5)');
       }
 
       // ─────────────────────────────────────────────────────────────────────────────
@@ -1509,25 +1365,25 @@
       // ─────────────────────────────────────────────────────────────────────────────
       function drawStepDone() {
         const step = STEPS[stepIdx];
-        ctx.fillStyle = "rgba(0,0,0,0.65)";
+        ctx.fillStyle = 'rgba(0,0,0,0.65)';
         ctx.fillRect(0, 0, W, H);
 
-        shadow(24, "rgba(255,200,0,0.5)");
-        txt("Step Complete!", W / 2, 210, 46, "#FFD040");
+        shadow(24, 'rgba(255,200,0,0.5)');
+        txt('Step Complete!', W / 2, 210, 46, '#FFD040');
         noShadow();
         txt(`Score: ${step.score} / 100`, W / 2, 262, 30, C.accent);
         drawStars(step.score, W / 2, 320);
 
-        const label = stepIdx < 6 ? "Next Step  →" : "🎂  See Your Cake!";
+        const label = stepIdx < 6 ? 'Next Step  →' : '🎂  See Your Cake!';
         const pulse = 0.94 + Math.sin(frameT * 0.07) * 0.06;
         ctx.save();
         ctx.translate(W / 2, 430);
         ctx.scale(pulse, pulse);
-        shadow(18, "rgba(255,140,0,0.4)");
-        roundRect(-110, -28, 220, 56, 28, "#D06010");
-        roundRect(-108, -26, 216, 52, 27, "#F09040");
+        shadow(18, 'rgba(255,140,0,0.4)');
+        roundRect(-110, -28, 220, 56, 28, '#D06010');
+        roundRect(-108, -26, 216, 52, 27, '#F09040');
         noShadow();
-        txt(label, 0, 8, 20, "#FFF5E0");
+        txt(label, 0, 8, 20, '#FFF5E0');
         ctx.restore();
       }
 
@@ -1536,14 +1392,14 @@
       // ─────────────────────────────────────────────────────────────────────────────
       function drawResult() {
         const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, 520);
-        g.addColorStop(0, "#3D1A08");
-        g.addColorStop(1, "#080300");
+        g.addColorStop(0, '#3D1A08');
+        g.addColorStop(1, '#080300');
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, W, H);
         drawSwooshes();
 
-        shadow(26, "rgba(255,180,0,0.5)");
-        txt("Your Berry Cream Roll Cake!", W / 2, 64, 38, "#FFD050");
+        shadow(26, 'rgba(255,180,0,0.5)');
+        txt('Your Berry Cream Roll Cake!', W / 2, 64, 38, '#FFD050');
         noShadow();
 
         // Final cake slice on a plate
@@ -1553,12 +1409,12 @@
         ctx.translate(0, bob);
 
         // Plate
-        shadow(16, "rgba(0,0,0,0.4)");
-        ctx.fillStyle = "#F8F8FA";
+        shadow(16, 'rgba(0,0,0,0.4)');
+        ctx.fillStyle = '#F8F8FA';
         ctx.beginPath();
         ctx.ellipse(0, 68, 105, 18, 0, 0, PI2);
         ctx.fill();
-        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
         ctx.beginPath();
         ctx.ellipse(0, 68, 95, 14, 0, 0, PI2);
         ctx.fill();
@@ -1566,7 +1422,7 @@
 
         // Slice (side view)
         const sw = 56;
-        shadow(20, "rgba(0,0,0,0.4)");
+        shadow(20, 'rgba(0,0,0,0.4)');
         ctx.fillStyle = C.nut;
         ctx.beginPath();
         ctx.ellipse(0, 0, sw / 2, 54, 0, 0, PI2);
@@ -1593,17 +1449,15 @@
         ctx.restore();
 
         // Stars & score
-        const total = Math.round(
-          scores.reduce((s, v) => s + v, 0) / scores.length,
-        );
+        const total = Math.round(scores.reduce((s, v) => s + v, 0) / scores.length);
         const stars = drawStars(total, W / 2, 380);
         txt(`Total Score: ${total} / 100`, W / 2, 425, 26, C.accent);
         txt(
           stars === 3
             ? "Perfect! You're a pastry chef!"
             : stars === 2
-              ? "Delicious! Nearly flawless!"
-              : "A tasty first attempt!",
+              ? 'Delicious! Nearly flawless!'
+              : 'A tasty first attempt!',
           W / 2,
           458,
           18,
@@ -1614,14 +1468,8 @@
         STEPS.forEach((s, i) => {
           const sx = W / 2 - ((STEPS.length - 1) * 52) / 2 + i * 52,
             sy = 498;
-          roundRect(sx - 24, sy - 18, 48, 32, 6, "rgba(0,0,0,0.4)");
-          txt(
-            s.title.split(" ").slice(-1)[0],
-            sx,
-            sy - 4,
-            10,
-            "rgba(255,220,150,0.7)",
-          );
+          roundRect(sx - 24, sy - 18, 48, 32, 6, 'rgba(0,0,0,0.4)');
+          txt(s.title.split(' ').slice(-1)[0], sx, sy - 4, 10, 'rgba(255,220,150,0.7)');
           txt(`${scores[i] || 0}`, sx, sy + 11, 13, C.accent);
         });
 
@@ -1630,11 +1478,11 @@
         ctx.save();
         ctx.translate(W / 2, 548);
         ctx.scale(pulse, pulse);
-        shadow(16, "rgba(255,140,0,0.4)");
-        roundRect(-90, -22, 180, 44, 22, "#D06010");
-        roundRect(-88, -20, 176, 40, 21, "#F09040");
+        shadow(16, 'rgba(255,140,0,0.4)');
+        roundRect(-90, -22, 180, 44, 22, '#D06010');
+        roundRect(-88, -20, 176, 40, 21, '#F09040');
         noShadow();
-        txt("Play Again", 0, 6, 18, "#FFF5E0");
+        txt('Play Again', 0, 6, 18, '#FFF5E0');
         ctx.restore();
       }
 
@@ -1645,16 +1493,16 @@
         frameT++;
         ctx.clearRect(0, 0, W, H);
 
-        if (state === "title") {
+        if (state === 'title') {
           drawTitle();
-        } else if (state === "step") {
+        } else if (state === 'step') {
           STEPS[stepIdx].update();
           STEPS[stepIdx].draw();
-          if (STEPS[stepIdx].complete) state = "step_done";
-        } else if (state === "step_done") {
+          if (STEPS[stepIdx].complete) state = 'step_done';
+        } else if (state === 'step_done') {
           STEPS[stepIdx].draw();
           drawStepDone();
-        } else if (state === "result") {
+        } else if (state === 'result') {
           drawResult();
         }
 
@@ -1682,28 +1530,28 @@
         mouse.down = true;
         mouse.pressed = true;
 
-        if (state === "title") {
+        if (state === 'title') {
           stepIdx = 0;
           scores = [];
           STEPS[0].init();
-          state = "step";
-        } else if (state === "step") {
+          state = 'step';
+        } else if (state === 'step') {
           STEPS[stepIdx].click(x, y);
-        } else if (state === "step_done") {
+        } else if (state === 'step_done') {
           scores[stepIdx] = STEPS[stepIdx].score;
           stepIdx++;
           if (stepIdx >= STEPS.length) {
-            state = "result";
+            state = 'result';
           } else {
             STEPS[stepIdx].init();
-            state = "step";
+            state = 'step';
           }
-        } else if (state === "result") {
+        } else if (state === 'result') {
           if (y > 526 && y < 570) {
             stepIdx = 0;
             scores = [];
             STEPS[0].init();
-            state = "step";
+            state = 'step';
           }
         }
       }
@@ -1719,13 +1567,13 @@
         mouse.down = false;
       }
 
-      canvas.addEventListener("mousedown", onDown);
-      canvas.addEventListener("mousemove", onMove);
-      canvas.addEventListener("mouseup", onUp);
-      canvas.addEventListener("mouseleave", onUp);
-      canvas.addEventListener("touchstart", onDown, { passive: false });
-      canvas.addEventListener("touchmove", onMove, { passive: false });
-      canvas.addEventListener("touchend", onUp);
+      canvas.addEventListener('mousedown', onDown);
+      canvas.addEventListener('mousemove', onMove);
+      canvas.addEventListener('mouseup', onUp);
+      canvas.addEventListener('mouseleave', onUp);
+      canvas.addEventListener('touchstart', onDown, { passive: false });
+      canvas.addEventListener('touchmove', onMove, { passive: false });
+      canvas.addEventListener('touchend', onUp);
 
       loop();
     </script>
