@@ -1,25 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Archive Lookup",
-  "version": "1.0.1",
-  "description": "Look up archived snapshots of any link via right-click, or scan pages to find preserved articles",
-  "permissions": ["contextMenus", "storage", "activeTab", "scripting", "declarativeNetRequest"],
-  "host_permissions": [
-    "https://archive.today/*",
-    "https://archive.is/*",
-    "https://archive.md/*",
-    "https://archive.ph/*"
-  ],
-  "optional_host_permissions": ["*://*/*"],
-  "declarative_net_request": {
-    "rule_resources": [
-      {
-        "id": "archive_headers",
-        "enabled": true,
-        "path": "rules.json"
-      }
-    ]
-  },
+  "version": "1.1.0",
+  "description": "Right-click any link to look up its archived snapshot",
+  "permissions": ["contextMenus"],
   "background": {
     "service_worker": "background.js"
   },

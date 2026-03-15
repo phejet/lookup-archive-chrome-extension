@@ -3,7 +3,7 @@ import prettier from 'eslint-config-prettier';
 
 export default [
   {
-    ignores: ['node_modules/', 'eslint.config.mjs', 'chrome-extension-package/'],
+    ignores: ['node_modules/', 'eslint.config.mjs'],
   },
   js.configs.recommended,
   prettier,
@@ -57,15 +57,6 @@ export default [
         // Node/jsdom globals
         module: 'readonly',
         AbortController: 'readonly',
-      },
-    },
-  },
-  {
-    files: ['e2e/**/*.js', 'playwright.config.js'],
-    languageOptions: {
-      sourceType: 'module',
-      globals: {
-        process: 'readonly',
       },
     },
   },

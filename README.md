@@ -3,23 +3,14 @@
 [![Lint & Format](https://github.com/phejet/lookup-archive-chrome-extension/actions/workflows/lint.yml/badge.svg)](https://github.com/phejet/lookup-archive-chrome-extension/actions/workflows/lint.yml)
 [![Tests](https://github.com/phejet/lookup-archive-chrome-extension/actions/workflows/test.yml/badge.svg)](https://github.com/phejet/lookup-archive-chrome-extension/actions/workflows/test.yml)
 
-A Chrome extension for quickly looking up archived snapshots of web pages on [archive.today](https://archive.today). Handy for researchers, journalists, and anyone who wants to check if a page has been preserved in a web archive.
+A Chrome extension for quickly looking up archived snapshots of web pages. Handy for researchers, journalists, and anyone who wants to check if a page has been preserved in a web archive.
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/fumbledpelican)
 
 ## Features
 
-- **Right-click any link → "Look up on Archive.today"** — opens the latest archived snapshot in a new tab
-- **Right-click page → "Scan page for archives"** — scans visible article links and adds a small archive icon next to those with available snapshots. Click the icon to open the snapshot.
-- **Auto-scan** — automatically scans pages on your allowlisted sites as they load and as you scroll. Add domains in the extension popup — auto-scan is enabled by default.
-- **Snapshot age tooltips** — hover over an archive icon to see how old the snapshot is (e.g., "Archived 3 days ago")
-- **Smart filtering** — automatically matches the current site's domain, deduplicates links, skips non-article URLs, and only checks links visible on screen
-- **Minimal permissions** — starts with zero host permissions. Manual scans use `activeTab` (granted per right-click). Auto-scan sites are granted individually via a Chrome permission prompt when you add them.
-- **24-hour cache** — avoids redundant requests to archive.today (negative results expire after 2 hours)
-
-## How it works
-
-The extension uses archive.today's `/newest/<url>` endpoint, which redirects to the most recent archived snapshot of a given URL. For single lookups it opens this directly in a new tab. For page scans it checks the endpoint in the background and injects small indicator icons next to links that have archived snapshots.
+- **Right-click any link → "Archive Lookup"** — opens the latest archived snapshot in a new tab
+- **Minimal permissions** — only requires `contextMenus`
 
 ## Install
 
@@ -31,15 +22,4 @@ The extension uses archive.today's `/newest/<url>` endpoint, which redirects to 
 
 ## Usage
 
-Right-click any link on a page and select **"Look up on Archive.today"** — if an archived snapshot exists, it opens in a new tab.
-
-For bulk checking, right-click the page background and select **"Scan page for archives"**. It automatically scans links matching the current site's domain. Links with available snapshots get a small archive icon you can click. Hover over the icon to see how old the snapshot is.
-
-### Auto-scan
-
-Auto-scan is enabled by default. To set it up:
-
-1. Click the extension icon to open the popup
-2. Add domains to the allowlist (e.g. `example.com`) — type a domain and click **Add**, or click **Add current site**
-3. Chrome will prompt you to grant permission for each domain
-4. When you visit a page on an allowed domain, visible article links are scanned on load and as you scroll
+Right-click any link on a page and select **"Archive Lookup"** — if an archived snapshot exists, it opens in a new tab.

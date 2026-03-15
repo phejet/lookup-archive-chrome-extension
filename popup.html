@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <style>
       body {
-        width: 280px;
+        width: 260px;
         padding: 16px;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         font-size: 13px;
@@ -12,200 +12,41 @@
         line-height: 1.5;
       }
       h2 {
-        margin: 0 0 12px;
+        margin: 0 0 4px;
         font-size: 15px;
       }
       p {
-        margin: 0 0 10px;
+        margin: 0 0 12px;
+        font-size: 12px;
+        color: #666;
       }
-      .toggle-row {
-        display: flex;
+      .donate {
+        border-top: 1px solid #eee;
+        padding-top: 10px;
+        text-align: center;
+      }
+      .donate a {
+        display: inline-flex;
         align-items: center;
-        justify-content: space-between;
-        padding: 10px 0;
-        border-top: 1px solid #eee;
-      }
-      .toggle-row:first-of-type {
-        margin-top: 4px;
-      }
-      .toggle-label {
-        font-weight: 500;
-      }
-      .toggle-desc {
-        font-size: 12px;
-        color: #666;
-        margin-top: 2px;
-      }
-      .switch {
-        position: relative;
-        width: 36px;
-        height: 20px;
-        flex-shrink: 0;
-        margin-left: 12px;
-      }
-      .switch input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-      }
-      .slider {
-        position: absolute;
-        cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: #ccc;
-        border-radius: 20px;
-        transition: background 0.2s;
-      }
-      .slider::before {
-        content: '';
-        position: absolute;
-        height: 14px;
-        width: 14px;
-        left: 3px;
-        bottom: 3px;
-        background: white;
-        border-radius: 50%;
-        transition: transform 0.2s;
-      }
-      .switch input:checked + .slider {
-        background: #1a73e8;
-      }
-      .switch input:checked + .slider::before {
-        transform: translateX(16px);
-      }
-
-      .site-list-section {
-        padding: 10px 0;
-        border-top: 1px solid #eee;
-      }
-      .site-list-header {
-        font-weight: 500;
-        margin-bottom: 2px;
-      }
-      .site-list-desc {
-        font-size: 12px;
-        color: #666;
-        margin-bottom: 8px;
-      }
-      .site-input-row {
-        display: flex;
         gap: 6px;
-        margin-bottom: 6px;
-      }
-      .site-input-row input {
-        flex: 1;
-        padding: 4px 8px;
+        padding: 6px 12px;
+        background: #ffdd00;
+        color: #000;
+        text-decoration: none;
+        border-radius: 6px;
         font-size: 12px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        outline: none;
-      }
-      .site-input-row input:focus {
-        border-color: #1a73e8;
-      }
-      .btn {
-        padding: 4px 10px;
-        font-size: 12px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        background: #f8f8f8;
-        cursor: pointer;
-        white-space: nowrap;
-      }
-      .btn:hover {
-        background: #eee;
-      }
-      .btn-current {
-        width: 100%;
-        margin-bottom: 8px;
-      }
-      .site-list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-      }
-      .site-list li {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 4px 0;
-        font-size: 12px;
-      }
-      .site-list li + li {
-        border-top: 1px solid #f0f0f0;
-      }
-      .site-remove {
-        background: none;
-        border: none;
-        cursor: pointer;
-        color: #999;
-        font-size: 14px;
-        padding: 0 4px;
-        line-height: 1;
-      }
-      .site-remove:hover {
-        color: #e53935;
-      }
-      .site-empty {
-        font-size: 12px;
-        color: #999;
-        font-style: italic;
+        font-weight: 600;
       }
     </style>
   </head>
   <body>
     <h2>Archive Lookup</h2>
-    <p>
-      Right-click any link to look up its archived snapshot, or right-click the page to scan all
-      visible links.
-    </p>
-    <input type="hidden" id="auto-scan" />
-    <div class="site-list-section" id="site-list-section">
-      <div class="site-list-header">Auto-scan sites</div>
-      <div class="site-list-desc">Only auto-scan on these domains</div>
-      <div class="site-input-row">
-        <input type="text" id="site-input" placeholder="e.g. example.com" />
-        <button class="btn" id="add-site-btn">Add</button>
-      </div>
-      <button class="btn btn-current" id="add-current-site-btn">Add current site</button>
-      <ul class="site-list" id="site-list"></ul>
-      <div class="site-empty" id="site-empty">
-        No sites configured. Auto-scan is disabled until you add sites.
-      </div>
-    </div>
-    <input type="hidden" id="show-progress" />
-    <input type="hidden" id="debug-logging" />
-    <div style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 4px; text-align: center">
-      <a
-        href="https://buymeacoffee.com/fumbledpelican"
-        target="_blank"
-        rel="noopener noreferrer"
-        style="
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 12px;
-          background: #ffdd00;
-          color: #000;
-          text-decoration: none;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 600;
-        "
-      >
-        <img
-          src="icons/bmc-logo.svg"
-          alt=""
-          width="15"
-          height="21"
-          style="vertical-align: middle"
-        />
+    <p>Right-click any link to look up its archived snapshot.</p>
+    <div class="donate">
+      <a href="https://buymeacoffee.com/fumbledpelican" target="_blank" rel="noopener noreferrer">
+        <img src="icons/bmc-logo.svg" alt="" width="15" height="21" />
         Buy me a coffee
       </a>
     </div>
-    <script src="popup.js"></script>
   </body>
 </html>
