@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Archive Lookup",
-  "version": "1.0",
-  "description": "Find archived versions of articles behind paywalls",
+  "version": "1.0.1",
+  "description": "Look up archived snapshots of any link via right-click, or scan pages to find preserved articles",
   "permissions": ["contextMenus", "storage", "activeTab", "scripting", "declarativeNetRequest"],
   "host_permissions": [
     "https://archive.today/*",

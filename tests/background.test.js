@@ -313,7 +313,7 @@ describe('checkBatch', () => {
 
 describe('syncContentScriptRegistrations', () => {
   test('unregisters and registers for allowlisted sites', async () => {
-    await mod.syncContentScriptRegistrations(['nytimes.com', 'wsj.com']);
+    await mod.syncContentScriptRegistrations(['example.com', 'test.org']);
 
     expect(chrome.scripting.unregisterContentScripts).toHaveBeenCalledWith({
       ids: ['auto-scan'],
@@ -321,7 +321,7 @@ describe('syncContentScriptRegistrations', () => {
     expect(chrome.scripting.registerContentScripts).toHaveBeenCalledWith([
       {
         id: 'auto-scan',
-        matches: ['*://*.nytimes.com/*', '*://nytimes.com/*', '*://*.wsj.com/*', '*://wsj.com/*'],
+        matches: ['*://*.example.com/*', '*://example.com/*', '*://*.test.org/*', '*://test.org/*'],
         js: ['content.js'],
         css: ['styles.css'],
         runAt: 'document_idle',
@@ -395,10 +395,10 @@ describe('injectIntoMatchingTabs', () => {
       .mockResolvedValueOnce({ pong: true })
       .mockResolvedValue(undefined);
 
-    await mod.injectIntoMatchingTabs(['nytimes.com']);
+    await mod.injectIntoMatchingTabs(['example.com']);
 
     expect(chrome.tabs.query).toHaveBeenCalledWith({
-      url: ['*://*.nytimes.com/*', '*://nytimes.com/*'],
+      url: ['*://*.example.com/*', '*://example.com/*'],
     });
     // Tab 10 gets injected
     expect(chrome.scripting.executeScript).toHaveBeenCalledWith({

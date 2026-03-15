@@ -76,18 +76,18 @@ describe('normalizeDomain', () => {
 
 describe('addSite', () => {
   test('adds valid domain to list', async () => {
-    await mod.addSite('nytimes.com');
+    await mod.addSite('example.com');
     expect(chrome.permissions.request).toHaveBeenCalledWith({
-      origins: ['*://*.nytimes.com/*', '*://nytimes.com/*'],
+      origins: ['*://*.example.com/*', '*://example.com/*'],
     });
     expect(chrome.storage.sync.set).toHaveBeenCalledWith({
-      autoScanSites: ['nytimes.com'],
+      autoScanSites: ['example.com'],
     });
   });
 
   test('undoes save when permission denied', async () => {
     chrome.permissions.request.mockResolvedValue(false);
-    await mod.addSite('nytimes.com');
+    await mod.addSite('example.com');
     expect(chrome.permissions.request).toHaveBeenCalled();
     // First call saves, second call undoes
     expect(chrome.storage.sync.set).toHaveBeenCalledTimes(2);
@@ -112,16 +112,16 @@ describe('addSite', () => {
   });
 
   test('does not add duplicate domain', async () => {
-    await mod.addSite('nytimes.com');
+    await mod.addSite('example.com');
     chrome.storage.sync.set.mockClear();
-    await mod.addSite('nytimes.com');
+    await mod.addSite('example.com');
     expect(chrome.storage.sync.set).not.toHaveBeenCalled();
   });
 
   test('normalizes before adding', async () => {
-    await mod.addSite('https://www.nytimes.com/section');
+    await mod.addSite('https://www.example.com/section');
     expect(chrome.storage.sync.set).toHaveBeenCalledWith({
-      autoScanSites: ['nytimes.com'],
+      autoScanSites: ['example.com'],
     });
   });
 
@@ -135,14 +135,14 @@ describe('addSite', () => {
 
 describe('removeSite', () => {
   test('removes domain from list and revokes permission', async () => {
-    await mod.addSite('nytimes.com');
+    await mod.addSite('example.com');
     chrome.storage.sync.set.mockClear();
-    await mod.removeSite('nytimes.com');
+    await mod.removeSite('example.com');
     expect(chrome.storage.sync.set).toHaveBeenCalledWith({
       autoScanSites: [],
     });
     expect(chrome.permissions.remove).toHaveBeenCalledWith({
-      origins: ['*://*.nytimes.com/*', '*://nytimes.com/*'],
+      origins: ['*://*.example.com/*', '*://example.com/*'],
     });
   });
 

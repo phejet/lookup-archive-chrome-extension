@@ -40,6 +40,6 @@ For bulk checking, right-click the page background and select **"Scan page for a
 Auto-scan is enabled by default. To set it up:
 
 1. Click the extension icon to open the popup
-2. Add domains to the allowlist (e.g. `nytimes.com`) — type a domain and click **Add**, or click **Add current site**
+2. Add domains to the allowlist (e.g. `example.com`) — type a domain and click **Add**, or click **Add current site**
 3. Chrome will prompt you to grant permission for each domain
 4. When you visit a page on an allowed domain, visible article links are scanned on load and as you scroll

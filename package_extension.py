@@ -21,6 +21,8 @@ EXTENSION_FILES = [
     "icons/icon16.png",
     "icons/icon48.png",
     "icons/icon128.png",
+    "icons/bmc-logo.svg",
+    "rules.json",
 ]
 
 # Store listing docs
