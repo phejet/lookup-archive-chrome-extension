@@ -60,4 +60,13 @@ export default [
       },
     },
   },
+  {
+    files: ['e2e/**/*.js', 'playwright.config.js'],
+    languageOptions: {
+      sourceType: 'module',
+      globals: {
+        process: 'readonly',
+      },
+    },
+  },
 ];

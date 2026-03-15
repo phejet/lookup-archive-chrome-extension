@@ -3,7 +3,7 @@
   "name": "Archive Lookup",
   "version": "1.0",
   "description": "Find archived versions of articles behind paywalls",
-  "permissions": ["contextMenus", "storage", "activeTab", "scripting"],
+  "permissions": ["contextMenus", "storage", "activeTab", "scripting", "declarativeNetRequest"],
   "host_permissions": [
     "https://archive.today/*",
     "https://archive.is/*",
@@ -11,6 +11,15 @@
     "https://archive.ph/*"
   ],
   "optional_host_permissions": ["*://*/*"],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "archive_headers",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
   "background": {
     "service_worker": "background.js"
   },

@@ -230,6 +230,30 @@ describe('injectIndicator', () => {
     const indicators = link.querySelectorAll('.archive-today-indicator');
     expect(indicators.length).toBe(1);
   });
+
+  test('re-injects indicator on re-rendered link after URL was already checked', async () => {
+    // First render: indicator is present
+    document.body.innerHTML = `
+      <a id="old" href="https://example.com/news/some-article-slug">Old article</a>
+    `;
+    const oldLink = document.getElementById('old');
+    mod.injectIndicator(
+      oldLink,
+      'https://archive.md/20260226181830/https://example.com/news/some-article-slug',
+    );
+    expect(oldLink.querySelector('.archive-today-indicator')).not.toBeNull();
+
+    // Simulate feed re-render: old node removed, fresh node inserted
+    document.body.innerHTML = `
+      <a id="new" href="https://example.com/news/some-article-slug">New article</a>
+    `;
+    const newLink = document.getElementById('new');
+    mod.injectIndicator(
+      newLink,
+      'https://archive.md/20260226181830/https://example.com/news/some-article-slug',
+    );
+    expect(newLink.querySelector('.archive-today-indicator')).not.toBeNull();
+  });
 });
 
 describe('sendMessageWithTimeout', () => {

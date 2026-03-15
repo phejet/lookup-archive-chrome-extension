@@ -183,10 +183,12 @@ describe('checkArchive', () => {
   });
 
   test('returns null on fetch error', async () => {
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout').mockImplementation((fn) => fn() && 0);
     chrome.storage.local.get.mockResolvedValue({});
     fetch.mockRejectedValue(new Error('Network error'));
     const result = await mod.checkArchive('https://example.com/article');
     expect(result).toBeNull();
+    timeoutSpy.mockRestore();
   });
 
   test('returns cached value without fetching', async () => {
@@ -210,6 +212,37 @@ describe('checkArchive', () => {
       'https://archive.is/timemap/https://example.com/article',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
+  });
+});
+
+describe('fetchAndCache fallback behavior', () => {
+  test('falls back to /newest/ when timemap is non-OK and returns snapshot redirect URL', async () => {
+    fetch.mockResolvedValueOnce({ ok: false, status: 418 }).mockResolvedValueOnce({
+      ok: true,
+      url: 'https://archive.md/20260308120000/https://example.com/article',
+    });
+
+    const result = await mod.fetchAndCache('https://example.com/article');
+    expect(result).toBe('https://archive.md/20260308120000/https://example.com/article');
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({
+      ['cache_https://example.com/article']: expect.objectContaining({
+        snapshotUrl: 'https://archive.md/20260308120000/https://example.com/article',
+      }),
+    });
+  });
+
+  test('caches null when timemap returns definitive 404 and fallback cannot resolve', async () => {
+    fetch
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce({ ok: false, status: 404, url: 'https://archive.today/newest/' });
+
+    const result = await mod.fetchAndCache('https://example.com/article');
+    expect(result).toBeNull();
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({
+      ['cache_https://example.com/article']: expect.objectContaining({
+        snapshotUrl: null,
+      }),
+    });
   });
 });
 

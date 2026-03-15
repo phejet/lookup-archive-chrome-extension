@@ -14,6 +14,7 @@ const iconTemplate = (() => {
 })();
 
 const checkedUrls = new Set();
+const foundSnapshots = new Map(); // canon -> snapshotUrl
 let isAutoScan = true;
 let autoScanSites = [];
 let showOnDemandProgress = true;
@@ -33,7 +34,7 @@ function debugLog(...args) {
 // --- Priority queue + worker pool state ---
 const queue = new Map(); // canon -> { url, canon, elements[], state: 'pending'|'in-flight'|'done' }
 let activeWorkers = 0;
-const MAX_WORKERS = 5;
+const MAX_WORKERS = 1;
 let stats = { queued: 0, checked: 0, found: 0, notFound: 0, errors: 0 };
 let scanStartTime = 0;
 
@@ -99,9 +100,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message.action === 'scan-page') {
     currentScanIsManual = true;
-    // Reset stats for fresh banner on manual scan
-    stats = { queued: 0, checked: 0, found: 0, notFound: 0, errors: 0 };
-    scanStartTime = performance.now();
+    // Reset stats only when no scan work is currently active.
+    // If a manual trigger happens mid-scan, keep current progress visible.
+    if (activeWorkers === 0 && !hasPendingItems()) {
+      stats = { queued: 0, checked: 0, found: 0, notFound: 0, errors: 0 };
+      scanStartTime = performance.now();
+    }
     scanPage();
   }
 });
@@ -172,7 +176,13 @@ function collectNewLinks() {
     if (!isArticleUrl(href)) continue;
 
     const canon = canonicalPath(href);
-    if (checkedUrls.has(canon)) continue;
+    if (checkedUrls.has(canon)) {
+      // Feeds can re-render links after we've already checked them.
+      // Re-inject indicators for known archived URLs.
+      const knownSnapshot = foundSnapshots.get(canon);
+      if (knownSnapshot) injectIndicator(link, knownSnapshot);
+      continue;
+    }
 
     if (!urlToElements.has(canon)) {
       urlToElements.set(canon, { url: href, elements: [] });
@@ -184,7 +194,7 @@ function collectNewLinks() {
 }
 
 // --- Send message with timeout ---
-function sendMessageWithTimeout(msg, timeoutMs = 20000) {
+function sendMessageWithTimeout(msg, timeoutMs = 90000) {
   return Promise.race([
     new Promise((resolve, reject) => {
       chrome.runtime.sendMessage(msg, (response) => {
@@ -394,7 +404,10 @@ async function worker() {
       if (!item) break;
       try {
         const t0 = performance.now();
-        const snapshotUrl = await sendMessageWithTimeout({ action: 'check-single', url: item.url });
+        const snapshotUrl = await sendMessageWithTimeout({
+          action: 'check-single',
+          url: item.url,
+        });
         debugLog(
           'check-single took ' +
             Math.round(performance.now() - t0) +
@@ -408,6 +421,7 @@ async function worker() {
         item.state = 'done';
 
         if (snapshotUrl) {
+          foundSnapshots.set(item.canon, snapshotUrl);
           stats.found++;
           injectIndicatorsForCanon(item.canon, snapshotUrl);
         } else {
@@ -471,6 +485,7 @@ async function resolveCachedItems() {
         item.state = 'done';
         stats.checked++;
         if (snapshotUrl) {
+          foundSnapshots.set(item.canon, snapshotUrl);
           stats.found++;
           injectIndicatorsForCanon(item.canon, snapshotUrl);
         } else {
@@ -489,7 +504,9 @@ async function scanPage() {
   const entries = collectNewLinks();
   if (entries.length === 0) {
     debugLog('No new links to scan.');
-    if (currentScanIsManual && activeWorkers === 0) {
+    if (currentScanIsManual && activeWorkers > 0) {
+      updateBanner();
+    } else if (currentScanIsManual && activeWorkers === 0) {
       showStatus('No new article links to scan.');
       scheduleFade(3000);
     }
@@ -509,7 +526,13 @@ async function scanPage() {
       ' total in queue)',
   );
 
-  if (added === 0) return;
+  if (added === 0) {
+    // Manual retrigger while queue/workers already active should still show progress.
+    if (currentScanIsManual && (activeWorkers > 0 || hasPendingItems())) {
+      updateBanner();
+    }
+    return;
+  }
 
   updateBanner();
 
@@ -530,6 +553,8 @@ async function scanPage() {
 // --- Scroll detection via scroll event ---
 let scrollListening = false;
 let lastScanScrollY = 0;
+let mutationObserver = null;
+let mutationDebounceId = null;
 
 function onScroll() {
   const currentY = window.scrollY;
@@ -545,7 +570,6 @@ function onScroll() {
         checkedUrls.size,
     );
     lastScanScrollY = currentY;
-    currentScanIsManual = false;
     scanPage();
   }
 }
@@ -566,6 +590,79 @@ function stopScrollDetection() {
   }
 }
 
+function collectAnchorsFromNode(node, out) {
+  if (!node || node.nodeType !== 1) return;
+  if (node.matches?.('a[href]')) out.push(node);
+  const nested = node.querySelectorAll?.('a[href]');
+  if (!nested) return;
+  for (const a of nested) out.push(a);
+}
+
+function processAddedAnchors(anchors) {
+  if (anchors.length === 0) return false;
+  let shouldScan = false;
+  const currentHost = location.hostname;
+  for (const link of anchors) {
+    if (link.classList?.contains('archive-today-indicator')) continue;
+    if (link.querySelector?.('img')) continue;
+    const href = link.href;
+    if (!href) continue;
+    try {
+      const linkHost = new URL(href).hostname;
+      if (linkHost !== currentHost && !linkHost.endsWith('.' + currentHost)) continue;
+    } catch {
+      continue;
+    }
+    if (!isArticleUrl(href)) continue;
+    const canon = canonicalPath(href);
+    if (checkedUrls.has(canon)) {
+      const knownSnapshot = foundSnapshots.get(canon);
+      if (knownSnapshot) injectIndicator(link, knownSnapshot);
+    } else if (isInViewport(link)) {
+      shouldScan = true;
+    }
+  }
+  return shouldScan;
+}
+
+function onDomMutations(mutations) {
+  const anchors = [];
+  for (const mutation of mutations) {
+    for (const node of mutation.addedNodes) {
+      collectAnchorsFromNode(node, anchors);
+    }
+  }
+
+  const shouldScan = processAddedAnchors(anchors);
+  if (!shouldScan) return;
+
+  if (mutationDebounceId) clearTimeout(mutationDebounceId);
+  mutationDebounceId = setTimeout(() => {
+    mutationDebounceId = null;
+    scanPage();
+  }, 300);
+}
+
+function startMutationObserver() {
+  if (mutationObserver) return;
+  mutationObserver = new window.MutationObserver(onDomMutations);
+  mutationObserver.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
+}
+
+function stopMutationObserver() {
+  if (mutationObserver) {
+    mutationObserver.disconnect();
+    mutationObserver = null;
+  }
+  if (mutationDebounceId) {
+    clearTimeout(mutationDebounceId);
+    mutationDebounceId = null;
+  }
+}
+
 // --- Init ---
 async function init() {
   const data = await chrome.storage.sync.get({
@@ -583,6 +680,7 @@ async function init() {
     scanStartTime = performance.now();
     scanPage();
     startScrollDetection();
+    startMutationObserver();
   }
 }
 
@@ -598,8 +696,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
         scanStartTime = performance.now();
         scanPage();
         startScrollDetection();
+        startMutationObserver();
       } else {
         stopScrollDetection();
+        stopMutationObserver();
       }
     }
     if (changes.showOnDemandProgress) {

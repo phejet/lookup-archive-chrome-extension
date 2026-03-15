@@ -3,6 +3,7 @@ const NEGATIVE_CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours for "not found" res
 const NEWEST_BASE = 'https://archive.today/newest/';
 const TIMEMAP_BASE = 'https://archive.is/timemap/';
 const ARCHIVE_DOMAINS = ['archive.today', 'archive.is', 'archive.md', 'archive.ph'];
+const TRANSIENT_STATUSES = new Set([403, 408, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
 const cacheKey = (url) => 'cache_' + url;
 
 async function syncContentScriptRegistrations(sites) {
@@ -172,9 +173,12 @@ async function checkBatch(urls) {
     uncachedUrls.push(url);
   }
 
-  // Only fetch uncached URLs (sequentially to respect rate limits)
-  for (const url of uncachedUrls) {
-    results[url] = await fetchAndCache(url);
+  // Only fetch uncached URLs (sequentially with delays to respect rate limits)
+  for (let i = 0; i < uncachedUrls.length; i++) {
+    results[uncachedUrls[i]] = await fetchAndCache(uncachedUrls[i]);
+    if (i < uncachedUrls.length - 1) {
+      await new Promise((r) => setTimeout(r, 1000));
+    }
   }
 
   return results;
@@ -202,23 +206,113 @@ function parseTimemap(body) {
   return null;
 }
 
-// Fetch a URL's archived snapshot from the Memento TimeMap API and cache the result.
-async function fetchAndCache(url) {
-  let snapshotUrl = null;
+const MAX_RETRIES = 3;
+const RETRY_DELAYS = [3000, 6000, 12000];
+
+function isArchiveDomain(hostname) {
+  return ARCHIVE_DOMAINS.some((d) => hostname === d || hostname.endsWith('.' + d));
+}
+
+function parseSnapshotFromArchiveUrl(candidate) {
   try {
-    const response = await fetch(TIMEMAP_BASE + url, {
-      signal: AbortSignal.timeout(15000),
+    const parsed = new URL(candidate);
+    if (!isArchiveDomain(parsed.hostname)) return null;
+    if (!/\/\d{14}\//.test(parsed.pathname)) return null;
+    parsed.protocol = 'https:';
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
+
+function retryDelayForAttempt(attempt) {
+  return RETRY_DELAYS[Math.min(attempt, RETRY_DELAYS.length - 1)];
+}
+
+async function fetchViaNewest(url) {
+  try {
+    const response = await fetch(NEWEST_BASE + url, {
+      signal: AbortSignal.timeout(20000),
+      redirect: 'follow',
     });
-    if (response.ok) {
-      const body = await response.text();
-      snapshotUrl = parseTimemap(body);
+    if (!response.ok) return null;
+    return parseSnapshotFromArchiveUrl(response.url);
+  } catch {
+    return null;
+  }
+}
+
+// Fetch a URL's archived snapshot from the Memento TimeMap API and cache the result.
+// Only caches definitive answers (200 OK). Rate-limited responses are retried with
+// exponential backoff. Errored responses are not cached.
+async function fetchAndCache(url) {
+  let definitiveNotFound = false;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(TIMEMAP_BASE + url, {
+        signal: AbortSignal.timeout(15000),
+      });
+      if (response.ok) {
+        const body = await response.text();
+        const snapshotUrl = parseTimemap(body);
+        await setCache(url, snapshotUrl);
+        return snapshotUrl;
+      }
+      if (response.status === 404) {
+        definitiveNotFound = true;
+        break;
+      }
+      if (TRANSIENT_STATUSES.has(response.status)) {
+        if (attempt < MAX_RETRIES) {
+          const delay = retryDelayForAttempt(attempt);
+          console.warn(
+            'Archive.today transient status',
+            response.status,
+            'for',
+            url,
+            '— retrying in',
+            delay / 1000,
+            's',
+          );
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+        console.warn(
+          'Archive.today transient status',
+          response.status,
+          'for',
+          url,
+          '— giving up after',
+          MAX_RETRIES,
+          'retries',
+        );
+        break;
+      }
+      console.warn('Archive.today unexpected status', response.status, 'for', url);
+      break;
+    } catch (e) {
+      if (attempt < MAX_RETRIES) {
+        const delay = retryDelayForAttempt(attempt);
+        console.warn('Archive.today lookup failed for', url, '— retrying in', delay / 1000, 's', e);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      console.error('Archive.today lookup failed for', url, e);
+      break;
     }
-  } catch (e) {
-    console.error('Archive.today lookup failed for', url, e);
   }
 
-  await setCache(url, snapshotUrl);
-  return snapshotUrl;
+  // Fallback path: /newest/ can succeed in cases where timemap is throttled/challenged.
+  const fallbackSnapshot = await fetchViaNewest(url);
+  if (fallbackSnapshot) {
+    await setCache(url, fallbackSnapshot);
+    return fallbackSnapshot;
+  }
+
+  if (definitiveNotFound) {
+    await setCache(url, null);
+  }
+  return null;
 }
 
 // Check if a URL has an archived snapshot, using cache first.
@@ -287,6 +381,10 @@ if (typeof module !== 'undefined' && module.exports) {
     injectIntoMatchingTabs,
     evictStaleCache,
     fetchAndCache,
+    fetchViaNewest,
+    parseSnapshotFromArchiveUrl,
     NEGATIVE_CACHE_TTL_MS,
+    MAX_RETRIES,
+    RETRY_DELAYS,
   };
 }
